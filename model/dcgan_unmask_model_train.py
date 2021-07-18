@@ -70,10 +70,7 @@ class UnmaskingModel(pl.LightningModule):
         # input: [b, 3, 128, 128]
         # output: [b, 3, 128, 128]
         model = nn.Sequential(
-            nn.ConvTranspose2d(3, 1024, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(1024),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(1024, 512, 4, 2, 1, bias=False),
+            nn.ConvTranspose2d(3, 512, 4, 2, 1, bias=False),
             nn.BatchNorm2d(512),
             nn.ReLU(True),
             nn.ConvTranspose2d(512, 256, 4, 2, 1, bias=False),
@@ -109,8 +106,6 @@ class UnmaskingModel(pl.LightningModule):
         return model
 
     def forward(self, unmask_img, mask_img):
-        print (unmask_img.size())
-
         # discriminator model forwarding
         discriminator_p_real = self.discriminator(unmask_img)
         discriminator_p_fake = self.discriminator(self.generator(unmask_img))
