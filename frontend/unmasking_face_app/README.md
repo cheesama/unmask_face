@@ -2,3 +2,6 @@
 
 ## first step
 - install expo-cli
+
+## To-do
+- using react-native-cli
