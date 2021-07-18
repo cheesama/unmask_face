@@ -78,7 +78,7 @@ if __name__ == "__main__":
     train_dataset, val_dataset = create_maskPair_dataset(
         args.mask_img_path, args.unmask_img_path, args.mask_prefix, args.train_ratio
     )
-    train_dataset = train_dataset.shuffle().batch(args.batch_size)
+    train_dataset = train_dataset.shuffle(len(train_dataset)).batch(args.batch_size)
     val_dataset = val_dataset.batch(args.batch_size)
 
     model = create_unmasking_model()
