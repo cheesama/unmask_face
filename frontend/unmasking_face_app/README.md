@@ -1,7 +1,9 @@
 # unmasking app using react-native
 
-## first step
+## First step
 - install expo-cli
+
+## How to use
 
 ## To-do
 - using react-native-cli
