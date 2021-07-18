@@ -11,7 +11,6 @@ import pytorch_lightning as pl
 
 import argparse
 import os, sys
-import multiprocessing
 
 # load image files from specific folder
 # it return unmask image & mask image pair
@@ -158,6 +157,12 @@ class UnmaskingModel(pl.LightningModule):
 
 
 if __name__ == "__main__":
+    from torch import multiprocessing
+    try:
+        multiprocessing.set_start_method('spawn')
+    except RuntimeError:
+        pass
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--img_size", type=int, default=128)
