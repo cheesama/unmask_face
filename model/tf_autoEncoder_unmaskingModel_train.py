@@ -48,6 +48,8 @@ def create_unmasking_model():
     autoEncoder.compile(optimizer="adam", loss="mean_squared_error")
     autoEncoder.summary()
 
+    return autoEncoder
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
