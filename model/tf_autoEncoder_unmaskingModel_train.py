@@ -18,9 +18,7 @@ def create_maskPair_dataset(
         unmask_imgs.append(img_to_array(load_img(os.path.join(unmask_img_path, maskImg.replace(mask_prefix, "")), target_size=(128, 128))))
         mask_imgs.append(img_to_array(load_img(os.path.join(mask_img_path, maskImg), target_size=(128, 128))))
 
-    full_dataset = tf.data.Dataset.from_tensor_slices(
-        (mask_imgs, unmask_imgs)
-    ).shuffle()
+    full_dataset = tf.data.Dataset.from_tensor_slices((mask_imgs, unmask_imgs)).shuffle(len(mask_imgs))
     train_dataset = full_dataset.take(int(len(mask_imgs) * train_ratio))
     val_dataset = full_dataset.skip(int(len(mask_imgs) * train_ratio))
 
