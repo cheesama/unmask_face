@@ -70,7 +70,7 @@ if __name__ == "__main__":
         "--train_ratio", type=float, default=0.8, help="ratio of train data"
     )
     parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--batch_size", type=float, default=32)
+    parser.add_argument("--batch_size", type=int, default=32)
     args = parser.parse_args()
 
     train_dataset, val_dataset = create_maskPair_dataset(
