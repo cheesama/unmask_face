@@ -133,8 +133,9 @@ class UnmaskingModel(pl.LightningModule):
         loss_g = self.loss_func(generator_p_fake, torch.ones_like(generator_p_fake))
 
         loss = loss_d + loss_g
-
         self.log("loss", loss)
+
+        return loss
 
     def validation_step(self, batch, batch_idx):
         self.generator.eval()
