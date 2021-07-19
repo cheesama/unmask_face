@@ -22,7 +22,7 @@ global_mask_prefix = ''
 
 def add_image_data(maskImg):
     maskImgName = f'{maskImg.split(".")[0]}.{global_mask_img_format}'
-    unmaskImgName = f'{maskImgName.replace(global_mask_prefix, "")}.{global_unmask_img_format}'
+    unmaskImgName = f'{maskImgName.split(".")[0].replace(global_mask_prefix, "")}.{global_unmask_img_format}'
 
     if unmaskImgName in os.listdir(global_unmask_img_path):
         image_pair = []
