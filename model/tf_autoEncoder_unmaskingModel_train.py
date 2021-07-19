@@ -9,7 +9,6 @@ import tensorflow as tf
 import os, sys
 import argparse
 
-
 def create_maskPair_dataset(
     mask_img_path,
     unmask_img_path,
@@ -25,7 +24,7 @@ def create_maskPair_dataset(
                 load_img(
                     os.path.join(
                         unmask_img_path,
-                        maskImg.replace(mask_prefix, "").split(".")[0]
+                        maskImg.replace(mask_prefix, "").split(".")[0] + '.' + 
                         + unmask_img_format,
                     ),
                     target_size=(128, 128),
@@ -36,7 +35,7 @@ def create_maskPair_dataset(
             img_to_array(
                 load_img(
                     os.path.join(
-                        mask_img_path, maskImg.split(".")[0] + mask_img_format
+                        mask_img_path, maskImg.split(".")[0] + '.' + mask_img_format
                     ),
                     target_size=(128, 128),
                 )
@@ -88,12 +87,14 @@ if __name__ == "__main__":
         default="../data/img_align_celeba_png_masked",
         help="path of mask image",
     )
+    parser.add_argument("--mask_img_format", type=str, default="png")
     parser.add_argument(
         "--unmask_img_path",
         type=str,
         default="../data/img_align_celeba_png",
         help="path of unmask image",
     )
+    parser.add_argument("--unmask_img_format", type=str, default="jpg")
     parser.add_argument(
         "--mask_prefix", type=str, default="_cloth", help="prefix of mask image"
     )
@@ -118,3 +119,4 @@ if __name__ == "__main__":
         validation_data=val_dataset,
         epochs=args.epochs,
     )
+    
