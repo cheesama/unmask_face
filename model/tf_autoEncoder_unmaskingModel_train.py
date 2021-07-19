@@ -14,20 +14,20 @@ manager = multiprocessing.Manager()
 image_list = manager.list()
 pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
 
-mask_img_path = ''
-mask_img_format = ''
-unmask_img_path = ''
-unmask_img_format = ''
-mask_prefix = ''
+global_mask_img_path = ''
+global_mask_img_format = ''
+global_unmask_img_path = ''
+global_unmask_img_format = ''
+global_mask_prefix = ''
 
 def add_image_data(maskImg):
-    maskImgName = f'{maskImg.split(".")[0]}.{mask_img_format}'
-    unmaskImgName = f'{maskImgName.replace(mask_prefix, "")}.{unmask_img_format}'
+    maskImgName = f'{maskImg.split(".")[0]}.{global_mask_img_format}'
+    unmaskImgName = f'{maskImgName.replace(mask_prefix, "")}.{global_unmask_img_format}'
 
-    if unmaskImgName in os.listdir(unmask_img_path):
+    if unmaskImgName in os.listdir(global_unmask_img_path):
         image_pair = []
-        image_pair.append(img_to_array(load_img(os.path.join(mask_img_path, maskImgName), target_size=(128, 128))))
-        image_pair.append(img_to_array(load_img(os.path.join(unmask_img_path, unmaskImgName), target_size=(128, 128))))
+        image_pair.append(img_to_array(load_img(os.path.join(global_mask_img_path, maskImgName), target_size=(128, 128))))
+        image_pair.append(img_to_array(load_img(os.path.join(global_unmask_img_path, unmaskImgName), target_size=(128, 128))))
         image_list.append(image_pair)
     else:
         print (f'check image pair info: {maskImgName}')
@@ -41,16 +41,16 @@ def create_maskPair_dataset(
     train_ratio=0.8,
 ):
     # set gloabl variables
-    global mask_img_path
-    global mask_img_format
-    global unmask_img_path
-    global unmask_img_format
-    global mask_prefix
-    mask_img_path = mask_img_path
-    mask_img_format = mask_img_format
-    unmask_img_path = unmask_img_path   
-    unmask_img_format = unmask_img_format
-    mask_prefix = mask_prefix
+    global global_mask_img_path
+    global global_mask_img_format
+    global global_unmask_img_path
+    global global_unmask_img_format
+    global global_mask_prefix
+    global_mask_img_path = mask_img_path
+    global_mask_img_format = mask_img_format
+    global_unmask_img_path = unmask_img_path   
+    global_unmask_img_format = unmask_img_format
+    global_mask_prefix = mask_prefix
     
     global pool
     tqdm(pool.imap(add_image_data, os.listdir(mask_img_path)), total=len(os.listdir(mask_img_path)), desc='loading image data ...')
