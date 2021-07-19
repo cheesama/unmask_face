@@ -11,21 +11,48 @@ import argparse
 
 
 def create_maskPair_dataset(
-    mask_img_path, unmask_img_path, mask_prefix="_cloth", train_ratio=0.8
+    mask_img_path,
+    unmask_img_path,
+    mask_prefix="_cloth",
+    mask_img_format="png",
+    unmask_img_format="jpg",
+    train_ratio=0.8,
 ):
     mask_imgs, unmask_imgs = [], []
     for maskImg in tqdm(os.listdir(mask_img_path), desc="loading image data ..."):
-        unmask_imgs.append(img_to_array(load_img(os.path.join(unmask_img_path, maskImg.replace(mask_prefix, "")), target_size=(128, 128))))
-        mask_imgs.append(img_to_array(load_img(os.path.join(mask_img_path, maskImg), target_size=(128, 128))))
+        unmask_imgs.append(
+            img_to_array(
+                load_img(
+                    os.path.join(
+                        unmask_img_path,
+                        maskImg.replace(mask_prefix, "").split(".")[0]
+                        + unmask_img_format,
+                    ),
+                    target_size=(128, 128),
+                )
+            )
+        )
+        mask_imgs.append(
+            img_to_array(
+                load_img(
+                    os.path.join(
+                        mask_img_path, maskImg.split(".")[0] + mask_img_format
+                    ),
+                    target_size=(128, 128),
+                )
+            )
+        )
 
-    full_dataset = tf.data.Dataset.from_tensor_slices((mask_imgs, unmask_imgs)).shuffle(len(mask_imgs))
+    full_dataset = tf.data.Dataset.from_tensor_slices((mask_imgs, unmask_imgs)).shuffle(
+        len(mask_imgs)
+    )
     train_dataset = full_dataset.take(int(len(mask_imgs) * train_ratio))
     val_dataset = full_dataset.skip(int(len(mask_imgs) * train_ratio))
 
     return train_dataset, val_dataset
 
 
-def create_unmasking_model():
+def create_unmasking_model(lr=1e-4):
     input = layers.Input(shape=(128, 128, 3))
 
     # Encoder
@@ -43,9 +70,11 @@ def create_unmasking_model():
     )(x)
     x = layers.Conv2D(3, (3, 3), activation="sigmoid", padding="same")(x)
 
+    optimizer = tf.keras.optimizers.Adam(lr=lr)
+
     # Autoencoder
     autoEncoder = Model(input, x)
-    autoEncoder.compile(optimizer="adam", loss="mean_squared_error")
+    autoEncoder.compile(optimizer=optimizer, loss="mean_squared_error")
     autoEncoder.summary()
 
     return autoEncoder
@@ -73,6 +102,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--lr", type=float, default=1e-4)
     args = parser.parse_args()
 
     train_dataset, val_dataset = create_maskPair_dataset(
@@ -81,7 +111,7 @@ if __name__ == "__main__":
     train_dataset = train_dataset.shuffle(len(train_dataset)).batch(args.batch_size)
     val_dataset = val_dataset.batch(args.batch_size)
 
-    model = create_unmasking_model()
+    model = create_unmasking_model(lr=args.lr)
 
     model.fit(
         train_dataset,
