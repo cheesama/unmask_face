@@ -7,6 +7,7 @@ from tqdm.auto import tqdm
 import tensorflow as tf
 
 import os, sys
+import multiprocessing
 import argparse
 
 def create_maskPair_dataset(
@@ -17,24 +18,31 @@ def create_maskPair_dataset(
     unmask_img_format="jpg",
     train_ratio=0.8,
 ):
-    mask_imgs, unmask_imgs = [], []
-    for maskImg in tqdm(os.listdir(mask_img_path), desc="loading image data ..."):
-        maskImgName = maskImg.split(".")[0]
-        unmaskImgName = maskImgName.replace(mask_prefix, "")
-        if f'{unmaskImgName}.{unmask_img_format}' in os.listdir(unmask_img_path):
-            unmask_imgs.append(img_to_array(load_img(os.path.join(unmask_img_path, f'{unmaskImgName}.{unmask_img_format}'), target_size=(128, 128))))
-            mask_imgs.append(img_to_array(load_img(os.path.join(mask_img_path, f'{maskImgName}.{mask_img_format}'), target_size=(128, 128))))
+    manager = multiprocessing.Manager()
+    image_list = manager.list()
+    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+    
+    def add_image_data(maskImg):
+        maskImgName = f'{maskImg.split(".")[0]}.{mask_img_format}'
+        unmaskImgName = f'{maskImgName.replace(mask_prefix, "")}.{unmask_img_format}'
+
+        if unmaskImgName in os.listdir(unmask_img_path):
+            image_pair = []
+            image_pair.append(img_to_array(load_img(os.path.join(mask_img_path, maskImgName), target_size=(128, 128))))
+            image_pair.append(img_to_array(load_img(os.path.join(unmask_img_path, unmaskImgName), target_size=(128, 128))))
+            image_list.append(image_pair)
         else:
             print (f'check image pair info: {maskImgName}')
 
-    full_dataset = tf.data.Dataset.from_tensor_slices((mask_imgs, unmask_imgs)).shuffle(
-        len(mask_imgs)
-    )
-    train_dataset = full_dataset.take(int(len(mask_imgs) * train_ratio))
-    val_dataset = full_dataset.skip(int(len(mask_imgs) * train_ratio))
+    print ('loading image data ...')
+    pool.map(add_image_data, os.listdir(mask_img_path))
+    pool.close()
+
+    full_dataset = tf.data.Dataset.from_tensor_slices(([img_pair[0] for img_pair in image_list], [img_pair[1] for img_pair in image_list])).shuffle(len(image_list))
+    train_dataset = full_dataset.take(int(len(image_list) * train_ratio))
+    val_dataset = full_dataset.skip(int(len(image_list) * train_ratio))
 
     return train_dataset, val_dataset
-
 
 def create_unmasking_model(lr=1e-4):
     input = layers.Input(shape=(128, 128, 3))
