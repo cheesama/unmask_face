@@ -10,27 +10,21 @@ import os, sys
 import multiprocessing
 import argparse
 
-manager = multiprocessing.Manager()
-image_list = manager.list()
-pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+def add_image_data(maskImg, mask_img_path, unmask_img_path, mask_prefix, mask_img_format, unmask_img_format, image_list):
+    maskImgName = f'{maskImg.split(".")[0]}.{mask_img_format}'
+    unmaskImgName = f'{maskImgName.split(".")[0].replace(mask_prefix, "")}.{unmask_img_format}'
 
-global_mask_img_path = ''
-global_mask_img_format = ''
-global_unmask_img_path = ''
-global_unmask_img_format = ''
-global_mask_prefix = ''
-
-def add_image_data(maskImg):
-    maskImgName = f'{maskImg.split(".")[0]}.{global_mask_img_format}'
-    unmaskImgName = f'{maskImgName.split(".")[0].replace(global_mask_prefix, "")}.{global_unmask_img_format}'
-
-    if unmaskImgName in os.listdir(global_unmask_img_path):
+    if unmaskImgName in os.listdir(unmask_img_path):
         image_pair = []
-        image_pair.append(img_to_array(load_img(os.path.join(global_mask_img_path, maskImgName), target_size=(128, 128))))
-        image_pair.append(img_to_array(load_img(os.path.join(global_unmask_img_path, unmaskImgName), target_size=(128, 128))))
+        image_pair.append(img_to_array(load_img(os.path.join(mask_img_path, maskImgName), target_size=(128, 128))))
+        image_pair.append(img_to_array(load_img(os.path.join(unmask_img_path, unmaskImgName), target_size=(128, 128))))
         image_list.append(image_pair)
     else:
         print (f'check image pair info: {maskImgName}\t{unmaskImgName}')
+
+def chunks(l, n):
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
 
 def create_maskPair_dataset(
     mask_img_path,
@@ -39,23 +33,20 @@ def create_maskPair_dataset(
     mask_img_format="png",
     unmask_img_format="jpg",
     train_ratio=0.8,
+    thread_num=multiprocessing.cpu_count(),
 ):
-    # set gloabl variables
-    global global_mask_img_path
-    global global_mask_img_format
-    global global_unmask_img_path
-    global global_unmask_img_format
-    global global_mask_prefix
-    global_mask_img_path = mask_img_path
-    global_mask_img_format = mask_img_format
-    global_unmask_img_path = unmask_img_path   
-    global_unmask_img_format = unmask_img_format
-    global_mask_prefix = mask_prefix
-    
-    global pool
-    tqdm(pool.imap(add_image_data, os.listdir(mask_img_path)), total=len(os.listdir(mask_img_path)), desc='loading image data ...')
-    pool.close()
-    pool.join()
+    image_list = multiprocessing.Manager().list()
+    process_list = []
+
+    for i, maskImg in tqdm(enumerate(os.listdir(mask_img_path)), desc='loading image data ...'):
+        proc = multiprocessing.Process(target=add_image_data, args=(maskImg, mask_img_path, unmask_img_path, mask_prefix, mask_img_format, unmask_img_format, image_list))
+        process_list.append(proc)
+
+    for i in chunks(process_list, thread_num):    
+        for j in i:
+            j.start()
+        for j in i:
+            j.join()
 
     # mask_imgs, unmask_imgs = map(list, zip(*image_list))
     full_dataset = tf.data.Dataset.from_tensor_slices((map(list, zip(*image_list)))).shuffle(len(image_list))
