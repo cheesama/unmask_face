@@ -21,7 +21,7 @@ def create_maskPair_dataset(
     for maskImg in tqdm(os.listdir(mask_img_path), desc="loading image data ..."):
         maskImgName = maskImg.split(".")[0]
         unmaskImgName = maskImgName.replace(mask_prefix, "")
-        if unmaskImgName in os.listdir(unmask_img_path):
+        if f'{unmaskImgName}.{unmask_img_format}' in os.listdir(unmask_img_path):
             unmask_imgs.append(img_to_array(load_img(os.path.join(unmask_img_path, f'{unmaskImgName}.{unmask_img_format}'), target_size=(128, 128))))
             mask_imgs.append(img_to_array(load_img(os.path.join(mask_img_path, f'{maskImgName}.{mask_img_format}'), target_size=(128, 128))))
         else:
