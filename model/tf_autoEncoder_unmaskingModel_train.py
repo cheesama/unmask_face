@@ -91,7 +91,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     train_dataset, val_dataset = create_maskPair_dataset(
-        args.mask_img_path, args.unmask_img_path, args.mask_prefix, args.train_ratio
+        mask_img_path=args.mask_img_path, 
+        mask_img_format=args.mask_img_format,
+        unmask_img_path=args.unmask_img_path, 
+        unmask_img_format=args.unmask_img_format,
+        mask_prefix=args.mask_prefix, 
+        train_ratio=args.train_ratio
     )
     train_dataset = train_dataset.shuffle(len(train_dataset)).batch(args.batch_size)
     val_dataset = val_dataset.batch(args.batch_size)
