@@ -38,7 +38,7 @@ def create_maskPair_dataset(
     image_list = multiprocessing.Manager().list()
     process_list = []
 
-    for i, maskImg in tqdm(enumerate(os.listdir(mask_img_path)), desc='loading image data ...'):
+    for maskImg in tqdm(os.listdir(mask_img_path), desc='loading image data ...'):
         proc = multiprocessing.Process(target=add_image_data, args=(maskImg, mask_img_path, unmask_img_path, mask_prefix, mask_img_format, unmask_img_format, image_list))
         process_list.append(proc)
 
