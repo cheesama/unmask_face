@@ -30,7 +30,7 @@ def add_image_data(maskImg):
         image_pair.append(img_to_array(load_img(os.path.join(global_unmask_img_path, unmaskImgName), target_size=(128, 128))))
         image_list.append(image_pair)
     else:
-        print (f'check image pair info: {maskImgName}')
+        print (f'check image pair info: {maskImgName}\t{unmaskImgName}')
 
 def create_maskPair_dataset(
     mask_img_path,
