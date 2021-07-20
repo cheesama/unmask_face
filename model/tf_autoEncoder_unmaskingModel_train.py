@@ -19,7 +19,7 @@ def create_maskPair_dataset(
     unmask_data = tf.keras.preprocessing.image_dataset_from_directory(mask_img_path, image_size=(img_size, img_size), label_mode=None)
     dataset_length = len(mask_data.file_paths)
 
-    full_dataset = tf.data.Dataset.zip((mask_data.unbatch(), unmask_data.unbatch())).shuffle(dataset_length)
+    full_dataset = tf.data.Dataset.zip((mask_data.unbatch(), unmask_data.unbatch()))#.shuffle(dataset_length)
     train_dataset = full_dataset.take(int(dataset_length * train_ratio))
     val_dataset = full_dataset.skip(int(dataset_length * train_ratio))
 
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--img_size", type=int, default=128)
     parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--lr", type=float, default=1e-4)
     args = parser.parse_args()
 
@@ -87,9 +87,14 @@ if __name__ == "__main__":
 
     model = create_unmasking_model(lr=args.lr)
 
+    # reggister callbacks
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="./logs", update_freq=10)
+    callback_list = [tensorboard_callback]
+
     model.fit(
         train_dataset,
         validation_data=val_dataset,
         epochs=args.epochs,
+        callbacks=callback_list,
     )
     

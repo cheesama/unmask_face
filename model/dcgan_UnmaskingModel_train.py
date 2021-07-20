@@ -11,6 +11,7 @@ import pytorch_lightning as pl
 
 import argparse
 import os, sys
+import multiprocessing
 
 # load image files from specific folder
 # it return unmask image & mask image pair
@@ -157,12 +158,6 @@ class UnmaskingModel(pl.LightningModule):
 
 
 if __name__ == "__main__":
-    from torch import multiprocessing
-    try:
-        multiprocessing.set_start_method('spawn')
-    except RuntimeError:
-        pass
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--img_size", type=int, default=128)
@@ -176,8 +171,8 @@ if __name__ == "__main__":
 
     # data preparation
     dataset = MaskDataset(
-        unmask_img_folder="../data/img_align_celeba_png",
-        mask_img_folder="../data/img_align_celeba_png_masked",
+        unmask_img_folder="../data/celeba-mask-pair/unmask_images/raw",
+        mask_img_folder="../data/celeba-mask-pair/mask_images/raw",
     )
     train_set, val_set = torch.utils.data.random_split(
         dataset,
