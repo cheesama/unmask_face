@@ -123,7 +123,7 @@ class UnmaskingModel(pl.LightningModule):
 class PrintImageCallback(Callback):
     def on_validation_epoch_end(self, trainer, pl_module):
         grid = torchvision.utils.make_grid(torch.cat(pl_module.tensorboard_imgs), nrow=8, padding=2)
-        trainer.writer.add_image(f"UnmaskingModel_epoch:{trainer.current_epoch}_predictions", grid, trainer.current_epoch)
+        trainer.logger.experiment.add_image(f"UnmaskingModel_epoch:{trainer.current_epoch}_predictions", grid, trainer.current_epoch)
         pl_module.tensorboard_imgs = []
 
 if __name__ == "__main__":
