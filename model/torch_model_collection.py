@@ -13,7 +13,8 @@ class UNet(nn.Module):
                                  kernel_size=kernel_size, stride=stride, padding=padding,
                                  bias=bias)]
             layers += [nn.BatchNorm2d(num_features=out_channels)]
-            layers += [nn.ReLU()]
+            #layers += [nn.ReLU()]
+            layers += [nn.LeakyReLU()]
 
             cbr = nn.Sequential(*layers)
 

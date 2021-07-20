@@ -1,7 +1,9 @@
+from pytorch_lightning import callbacks
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
 from tqdm.auto import tqdm
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 from torch_model_collection import UNet
 
@@ -76,11 +78,12 @@ class MaskingDataModule(pl.LightningDataModule):
         
 # model definition
 class UnmaskingModel(pl.LightningModule):
-    def __init__(self, lr=1e-4):
+    def __init__(self, lr=1e-4, latent_dim=(3,128,128)):
         super(UnmaskingModel, self).__init__()
         self.lr = lr
         self.loss_func = nn.MSELoss()
         self.model = UNet()
+        self.latent_dim = latent_dim
         
         self.save_hyperparameters()
 
@@ -137,11 +140,21 @@ if __name__ == "__main__":
         img_size=args.img_size,
     )
 
+    # register callbacks
+    checkpoint_callback = ModelCheckpoint(
+        monitor='val_loss',
+        dirpath='./',
+        filename='UNet_AutoEncoder_UnmaskingModel',
+        save_top_k=1,
+        mode='min',
+    )
+    
     # training
     trainer = pl.Trainer(
         gpus=torch.cuda.device_count(),
         progress_bar_refresh_rate=1,
         max_epochs=args.epochs,
         accelerator="ddp",
+        callbacks=[checkpoint_callback]
     )
     trainer.fit(model, dataset)
