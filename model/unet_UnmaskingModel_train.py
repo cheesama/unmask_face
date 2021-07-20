@@ -14,6 +14,7 @@ import argparse
 import os, sys
 import multiprocessing
 
+# dataset definition
 class MaskDataset(Dataset):
     def __init__(
         self, unmask_img_folder, mask_img_folder, img_size=128, mask_postfix='_cloth', transform=None
@@ -34,8 +35,6 @@ class MaskDataset(Dataset):
                 ]
             )
 
-        self.loss_func = nn.BCELoss()
-
     def __len__(self):
         return len(self.file_names)
 
@@ -48,11 +47,37 @@ class MaskDataset(Dataset):
 
         return mask_img_tensor, unmask_img_tensor
 
-
-class UnmaskingModel(pl.LightningModule):
-    def __init__(self, img_size=128, lr=1e-4):
-        super(UnmaskingModel, self).__init__()
+class MaskingDataModule(pl.LightningDataModule):
+    def __init__(self, unmask_img_folder, mask_img_folder, batch_size, train_ratio=0.8, img_size=128, mask_postfix='_cloth', transform=None):
+        super(MaskingDataModule, self).__init__()
+        self.unmask_img_folder = unmask_img_folder
+        self.mask_img_folder = mask_img_folder
+        self.mask_postfix = mask_postfix
         self.img_size = img_size
+        self.batch_size = batch_size
+        self.train_ratio = train_ratio
+        self.transform = transform
+
+    def setup(self, stage=None) -> None:
+        full_dataset = MaskDataset(self.unmask_img_folder, self.mask_img_folder, self.img_size, self.mask_postfix, self.transform)
+        self.train_set, self.val_set = torch.utils.data.random_split(
+            full_dataset,
+            [
+                int(self.train_ratio * len(full_dataset)),
+                len(full_dataset) - int(self.train_ratio * len(full_dataset)),
+            ],
+        )
+
+    def train_dataloader(self):
+        return DataLoader(self.train_set, batch_size=self.batch_size, shuffle=True, num_workers=multiprocessing.cpu_count())
+        
+    def val_dataloader(self):
+        return DataLoader(self.val_set, batch_size=self.batch_size, shuffle=False, num_workers=multiprocessing.cpu_count())
+        
+# model definition
+class UnmaskingModel(pl.LightningModule):
+    def __init__(self, lr=1e-4):
+        super(UnmaskingModel, self).__init__()
         self.lr = lr
         self.loss_func = nn.MSELoss()
         self.model = UNet()
@@ -61,9 +86,7 @@ class UnmaskingModel(pl.LightningModule):
 
     def forward(self, mask_img):
         unmask_predicted = self.model(mask_img)
-
         return unmask_predicted
-        
 
     def configure_optimizers(self):
         optim = torch.optim.Adam(self.parameters(), lr=self.lr)
@@ -88,9 +111,13 @@ class UnmaskingModel(pl.LightningModule):
             loss = self.loss_func(unmask_predicted, unmask_img)
             self.log("val_loss", loss)
 
+            return loss
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--unmask_img_folder", type=str, default="../data/celeba-mask-pair/unmask_images/raw")
+    parser.add_argument("--mask_img_folder", type=str, default="../data/celeba-mask-pair/mask_images/raw")
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--img_size", type=int, default=128)
     parser.add_argument("--epochs", type=int, default=10)
@@ -99,28 +126,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # model preparation
-    model = UnmaskingModel(img_size=args.img_size, lr=args.lr)
+    model = UnmaskingModel(lr=args.lr)
 
-    # data preparation
-    dataset = MaskDataset(
-        mask_img_folder="../data/celeba-mask-pair/mask_images/raw",
-        unmask_img_folder="../data/celeba-mask-pair/unmask_images/raw",
+    # data module preparation
+    dataset = MaskingDataModule(
+        mask_img_folder=args.mask_img_folder,
+        unmask_img_folder=args.unmask_img_folder,
+        batch_size=args.batch_size,
+        train_ratio=args.train_ratio,
+        img_size=args.img_size,
     )
-    train_set, val_set = torch.utils.data.random_split(
-        dataset,
-        [
-            int(args.train_ratio * len(dataset)),
-            len(dataset) - int(args.train_ratio * len(dataset)),
-        ],
-    )
-
-    train_loader = torch.utils.data.DataLoader(
-        train_set, batch_size=args.batch_size, shuffle=True, num_workers=multiprocessing.cpu_count()
-    )
-    val_loader = torch.utils.data.DataLoader(
-        val_set, batch_size=args.batch_size, shuffle=False, num_workers=multiprocessing.cpu_count()
-    )
-
+    
     # training
     trainer = pl.Trainer(
         gpus=torch.cuda.device_count(),
@@ -128,4 +144,4 @@ if __name__ == "__main__":
         max_epochs=args.epochs,
         accelerator="ddp",
     )
-    trainer.fit(model, train_loader, val_loader)
+    trainer.fit(model, dataset)
