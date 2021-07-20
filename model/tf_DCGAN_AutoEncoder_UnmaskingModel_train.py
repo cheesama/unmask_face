@@ -15,8 +15,8 @@ def create_maskPair_dataset(
     unmask_img_path,
     train_ratio=0.8,
 ):
-    mask_data = tf.keras.preprocessing.image_dataset_from_directory(mask_img_path, image_size=(img_size, img_size), label_mode=None)
-    unmask_data = tf.keras.preprocessing.image_dataset_from_directory(mask_img_path, image_size=(img_size, img_size), label_mode=None)
+    mask_data = tf.keras.preprocessing.image_dataset_from_directory(mask_img_path, image_size=(img_size, img_size), label_mode=None, shuffle=False)
+    unmask_data = tf.keras.preprocessing.image_dataset_from_directory(mask_img_path, image_size=(img_size, img_size), label_mode=None, shuffle=False)
     dataset_length = len(mask_data.file_paths)
 
     full_dataset = tf.data.Dataset.zip((mask_data.unbatch(), unmask_data.unbatch()))#.shuffle(dataset_length)

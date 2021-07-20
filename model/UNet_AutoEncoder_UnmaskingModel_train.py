@@ -81,8 +81,9 @@ class UnmaskingModel(pl.LightningModule):
     def __init__(self, lr=1e-4):
         super(UnmaskingModel, self).__init__()
         self.lr = lr
-        self.loss_func = nn.MSELoss()
         self.model = UNet()
+        #self.loss_func = nn.MSELoss()
+        self.loss_func = nn.MSELoss(reduction='sum')
 
         self.tensorboard_imgs = []
         
@@ -115,14 +116,14 @@ class UnmaskingModel(pl.LightningModule):
             loss = self.loss_func(unmask_predicted, unmask_img)
             self.log("val_loss", loss)
 
-            if batch_idx % 1000 == 0:
+            if batch_idx % 2000 == 0:
                 self.tensorboard_imgs.append(unmask_predicted)
 
             return loss
 
 class PrintImageCallback(Callback):
     def on_validation_epoch_end(self, trainer, pl_module):
-        grid = torchvision.utils.make_grid(torch.cat(pl_module.tensorboard_imgs), nrow=8, padding=2)
+        grid = torchvision.utils.make_grid(torch.cat(pl_module.tensorboard_imgs), nrow=6, padding=2)
         trainer.logger.experiment.add_image(f"UnmaskingModel_epoch:{trainer.current_epoch}_predictions", grid, trainer.current_epoch)
         pl_module.tensorboard_imgs = []
 
