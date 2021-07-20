@@ -3,7 +3,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
 from tqdm.auto import tqdm
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, Callback
 
 from torch_model_collection import UNet
 
@@ -78,12 +78,13 @@ class MaskingDataModule(pl.LightningDataModule):
         
 # model definition
 class UnmaskingModel(pl.LightningModule):
-    def __init__(self, lr=1e-4, latent_dim=(3,128,128)):
+    def __init__(self, lr=1e-4):
         super(UnmaskingModel, self).__init__()
         self.lr = lr
         self.loss_func = nn.MSELoss()
         self.model = UNet()
-        self.latent_dim = latent_dim
+
+        self.tensorboard_imgs = []
         
         self.save_hyperparameters()
 
@@ -114,8 +115,16 @@ class UnmaskingModel(pl.LightningModule):
             loss = self.loss_func(unmask_predicted, unmask_img)
             self.log("val_loss", loss)
 
+            if batch_idx % 1000 == 0:
+                self.tensorboard_imgs.append(unmask_predicted)
+
             return loss
 
+class PrintImageCallback(Callback):
+    def on_validation_epoch_end(self, trainer, pl_module):
+        grid = torchvision.utils.make_grid(torch.cat(pl_module.tensorboard_imgs), nrow=8, padding=2)
+        trainer.writer.add_image(f"UnmaskingModel_epoch:{trainer.current_epoch}_predictions", grid, trainer.current_epoch)
+        pl_module.tensorboard_imgs = []
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -155,6 +164,6 @@ if __name__ == "__main__":
         progress_bar_refresh_rate=1,
         max_epochs=args.epochs,
         accelerator="ddp",
-        callbacks=[checkpoint_callback]
+        callbacks=[checkpoint_callback, PrintImageCallback()]
     )
     trainer.fit(model, dataset)
