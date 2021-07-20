@@ -191,7 +191,7 @@ if __name__ == "__main__":
     # training
     trainer = pl.Trainer(
         gpus=torch.cuda.device_count(),
-        progress_bar_refresh_rate=0,
+        progress_bar_refresh_rate=1,
         max_epochs=args.epochs,
         accelerator="ddp",
     )

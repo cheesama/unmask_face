@@ -118,7 +118,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--unmask_img_folder", type=str, default="../data/celeba-mask-pair/unmask_images/raw")
     parser.add_argument("--mask_img_folder", type=str, default="../data/celeba-mask-pair/mask_images/raw")
-    parser.add_argument("--batch_size", type=int, default=4)
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--img_size", type=int, default=128)
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--lr", type=float, default=1e-4)
@@ -136,11 +136,11 @@ if __name__ == "__main__":
         train_ratio=args.train_ratio,
         img_size=args.img_size,
     )
-    
+
     # training
     trainer = pl.Trainer(
         gpus=torch.cuda.device_count(),
-        progress_bar_refresh_rate=0,
+        progress_bar_refresh_rate=1,
         max_epochs=args.epochs,
         accelerator="ddp",
     )
