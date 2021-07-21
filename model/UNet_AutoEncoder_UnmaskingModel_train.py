@@ -46,7 +46,7 @@ class MaskDataset(Dataset):
 
         unmask_img_tensor = self.transform(unmask_img)
         mask_img_tensor = self.transform(mask_img)
-        semantic_target = ((mask_img_tensor==unmask_img_tensor).float().sum(dim=1) == 3.).float().unsqueeze(1)
+        semantic_target = ((mask_img_tensor==unmask_img_tensor).float().sum(dim=0) == 3.).float().unsqueeze(0)
 
         return mask_img_tensor, unmask_img_tensor, semantic_target
 
@@ -83,9 +83,10 @@ class UnmaskingModel(pl.LightningModule):
         super(UnmaskingModel, self).__init__()
         self.lr = lr
         self.generator = UNet(use_semantic_label=True)
-        #self.loss_func = nn.MSELoss()
-        self.gen_loss_func = nn.MSELoss(reduction='sum')
-        self.semantic_loss_func = nn.BCELoss(reduction='sum')
+        
+        #self.gen_loss_func = nn.MSELoss(reduction='sum')
+        self.gen_loss_func = nn.MSELoss()
+        self.semantic_loss_func = nn.BCELoss()
 
         self.tensorboard_input_imgs = []
         self.tensorboard_pred_imgs = []
