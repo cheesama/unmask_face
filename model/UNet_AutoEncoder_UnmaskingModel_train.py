@@ -108,7 +108,7 @@ class UnmaskingModel(pl.LightningModule):
         unmask_predicted, semantic_predicted = self.forward(mask_img)
         gen_loss = self.gen_loss_func(unmask_predicted, unmask_img)
         semantic_loss = self.semantic_loss_func(semantic_predicted, semantic_target)
-        loss = gen_loss + semantic_loss
+        loss = gen_loss# + semantic_loss
 
         self.log("loss", loss)
         self.log("train/gen_loss", gen_loss)
@@ -124,7 +124,7 @@ class UnmaskingModel(pl.LightningModule):
             unmask_predicted, semantic_predicted = self.forward(mask_img)
             gen_loss = self.gen_loss_func(unmask_predicted, unmask_img)
             semantic_loss = self.semantic_loss_func(semantic_predicted, semantic_target)
-            loss = gen_loss + semantic_loss
+            loss = gen_loss# + semantic_loss
 
             self.log("val_loss", loss)
             self.log("val/gen_loss", gen_loss)
