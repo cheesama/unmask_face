@@ -82,11 +82,10 @@ class UnmaskingModel(pl.LightningModule):
     def __init__(self, lr=1e-4):
         super(UnmaskingModel, self).__init__()
         self.lr = lr
-        self.generator = UNet(use_semantic_label=True)
+        self.generator = UNet()
         
-        #self.gen_loss_func = nn.MSELoss(reduction='sum')
-        self.gen_loss_func = nn.MSELoss()
-        self.semantic_loss_func = nn.BCELoss()
+        self.gen_loss_func = nn.MSELoss(reduction='sum')
+        #self.semantic_loss_func = nn.BCELoss()
 
         self.tensorboard_input_imgs = []
         self.tensorboard_pred_imgs = []
@@ -105,15 +104,11 @@ class UnmaskingModel(pl.LightningModule):
         self.generator.train()
 
         mask_img, unmask_img, semantic_target = batch
-        unmask_predicted, semantic_predicted = self.forward(mask_img)
-        gen_loss = self.gen_loss_func(unmask_predicted, unmask_img)
-        semantic_loss = self.semantic_loss_func(semantic_predicted, semantic_target)
-        loss = gen_loss# + semantic_loss
-
+        unmask_predicted = self.forward(mask_img)
+        loss = self.gen_loss_func(unmask_predicted, unmask_img)
+        
         self.log("loss", loss)
-        self.log("train/gen_loss", gen_loss)
-        self.log("train/semantic_loss", semantic_loss)
-
+        
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -121,15 +116,11 @@ class UnmaskingModel(pl.LightningModule):
         
         with torch.no_grad():
             mask_img, unmask_img, semantic_target = batch
-            unmask_predicted, semantic_predicted = self.forward(mask_img)
-            gen_loss = self.gen_loss_func(unmask_predicted, unmask_img)
-            semantic_loss = self.semantic_loss_func(semantic_predicted, semantic_target)
-            loss = gen_loss# + semantic_loss
-
+            unmask_predicted = self.forward(mask_img)
+            loss = self.gen_loss_func(unmask_predicted, unmask_img)
+            
             self.log("val_loss", loss)
-            self.log("val/gen_loss", gen_loss)
-            self.log("val/semantic_loss", semantic_loss)
-
+            
             if batch_idx % 3000 == 0:
                 self.tensorboard_input_imgs.append(mask_img)
                 self.tensorboard_pred_imgs.append(unmask_predicted)
