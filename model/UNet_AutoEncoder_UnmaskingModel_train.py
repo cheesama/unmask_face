@@ -46,8 +46,9 @@ class MaskDataset(Dataset):
 
         unmask_img_tensor = self.transform(unmask_img)
         mask_img_tensor = self.transform(mask_img)
+        semantic_target = ((mask_img_tensor==unmask_img_tensor).float().sum(dim=1) == 3.).float().unsqueeze(1)
 
-        return mask_img_tensor, unmask_img_tensor
+        return mask_img_tensor, unmask_img_tensor, semantic_target
 
 class MaskingDataModule(pl.LightningDataModule):
     def __init__(self, unmask_img_folder, mask_img_folder, batch_size, train_ratio=0.8, img_size=128, mask_postfix='_cloth', transform=None):
@@ -102,10 +103,9 @@ class UnmaskingModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         self.generator.train()
 
-        mask_img, unmask_img = batch
+        mask_img, unmask_img, semantic_target = batch
         unmask_predicted, semantic_predicted = self.forward(mask_img)
         gen_loss = self.gen_loss_func(unmask_predicted, unmask_img)
-        semantic_target = ((mask_img==unmask_img).float().sum(dim=1) == 3.).float().unsqueeze(1)
         semantic_loss = self.semantic_loss_func(semantic_predicted, semantic_target)
         loss = gen_loss + semantic_loss
 
@@ -119,10 +119,9 @@ class UnmaskingModel(pl.LightningModule):
         self.generator.eval()
         
         with torch.no_grad():
-            mask_img, unmask_img = batch
+            mask_img, unmask_img, semantic_target = batch
             unmask_predicted, semantic_predicted = self.forward(mask_img)
             gen_loss = self.gen_loss_func(unmask_predicted, unmask_img)
-            semantic_target = ((mask_img==unmask_img).float().sum(dim=1) == 3.).float().unsqueeze(1)
             semantic_loss = self.semantic_loss_func(semantic_predicted, semantic_target)
             loss = gen_loss + semantic_loss
 
