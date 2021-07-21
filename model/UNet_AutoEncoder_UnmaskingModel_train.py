@@ -81,16 +81,18 @@ class UnmaskingModel(pl.LightningModule):
     def __init__(self, lr=1e-4):
         super(UnmaskingModel, self).__init__()
         self.lr = lr
-        self.model = UNet()
+        self.generator = UNet(use_semantic_label=True)
         #self.loss_func = nn.MSELoss()
-        self.loss_func = nn.MSELoss(reduction='sum')
+        self.gen_loss_func = nn.MSELoss(reduction='sum')
+        self.semantic_loss_func = nn.BCELoss(reduction='sum')
 
-        self.tensorboard_imgs = []
+        self.tensorboard_input_imgs = []
+        self.tensorboard_pred_imgs = []
         
         self.save_hyperparameters()
 
     def forward(self, mask_img):
-        unmask_predicted = self.model(mask_img)
+        unmask_predicted = self.generator(mask_img)
         return unmask_predicted
 
     def configure_optimizers(self):
@@ -98,34 +100,52 @@ class UnmaskingModel(pl.LightningModule):
         return optim
 
     def training_step(self, batch, batch_idx):
-        self.model.train()
+        self.generator.train()
 
         mask_img, unmask_img = batch
-        unmask_predicted = self.forward(mask_img)
-        loss = self.loss_func(unmask_predicted, unmask_img)
+        unmask_predicted, semantic_predicted = self.forward(mask_img)
+        gen_loss = self.gen_loss_func(unmask_predicted, unmask_img)
+        semantic_target = ((mask_img==unmask_img).float().sum(dim=1) == 3.).float().unsqueeze(1)
+        semantic_loss = self.semantic_loss_func(semantic_predicted, semantic_target)
+        loss = gen_loss + semantic_loss
+
         self.log("loss", loss)
+        self.log("train/gen_loss", gen_loss)
+        self.log("train/semantic_loss", semantic_loss)
 
         return loss
 
     def validation_step(self, batch, batch_idx):
-        self.model.eval()
+        self.generator.eval()
         
         with torch.no_grad():
             mask_img, unmask_img = batch
-            unmask_predicted = self.forward(mask_img)
-            loss = self.loss_func(unmask_predicted, unmask_img)
-            self.log("val_loss", loss)
+            unmask_predicted, semantic_predicted = self.forward(mask_img)
+            gen_loss = self.gen_loss_func(unmask_predicted, unmask_img)
+            semantic_target = ((mask_img==unmask_img).float().sum(dim=1) == 3.).float().unsqueeze(1)
+            semantic_loss = self.semantic_loss_func(semantic_predicted, semantic_target)
+            loss = gen_loss + semantic_loss
 
-            if batch_idx % 2000 == 0:
-                self.tensorboard_imgs.append(unmask_predicted)
+            self.log("val_loss", loss)
+            self.log("val/gen_loss", gen_loss)
+            self.log("val/semantic_loss", semantic_loss)
+
+            if batch_idx % 3000 == 0:
+                self.tensorboard_input_imgs.append(mask_img)
+                self.tensorboard_pred_imgs.append(unmask_predicted)
 
             return loss
 
 class PrintImageCallback(Callback):
     def on_validation_epoch_end(self, trainer, pl_module):
-        grid = torchvision.utils.make_grid(torch.cat(pl_module.tensorboard_imgs), nrow=6, padding=2)
-        trainer.logger.experiment.add_image(f"UnmaskingModel_epoch:{trainer.current_epoch}_predictions", grid, trainer.current_epoch)
-        pl_module.tensorboard_imgs = []
+        input_grid = torchvision.utils.make_grid(torch.cat(pl_module.tensorboard_input_imgs), nrow=6, padding=2)
+        trainer.logger.experiment.add_image(f"UnmaskingModel_epoch:{trainer.current_epoch}_inputs", input_grid, trainer.current_epoch)
+        
+        pred_grid = torchvision.utils.make_grid(torch.cat(pl_module.tensorboard_pred_imgs), nrow=6, padding=2)
+        trainer.logger.experiment.add_image(f"UnmaskingModel_epoch:{trainer.current_epoch}_predictions", pred_grid, trainer.current_epoch)
+
+        pl_module.tensorboard_input_imgs = []
+        pl_module.tensorboard_pred_imgs = []
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

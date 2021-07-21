@@ -4,9 +4,10 @@ import torch
 import torch.nn as nn
 
 class UNet(nn.Module):
-    def __init__(self):
+    def __init__(self, use_semantic_label=False):
         super(UNet, self).__init__()
-
+        self.use_semantic_label = use_semantic_label
+        
         def CBR2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=True):
             layers = []
             layers += [nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
@@ -70,6 +71,10 @@ class UNet(nn.Module):
         self.dec1_2 = CBR2d(in_channels=2 * 64, out_channels=64)
         self.dec1_1 = CBR2d(in_channels=64, out_channels=3)
 
+        if self.use_semantic_label:
+            self.semantic_label_map1 = CBR2d(in_channels=64, out_channels=1)
+            self.semantic_label_map2 = nn.Sigmoid()
+
         #self.fc = nn.Conv2d(in_channels=64, out_channels=1, kernel_size=1, stride=1, padding=0, bias=True)
 
     def forward(self, x):
@@ -111,9 +116,12 @@ class UNet(nn.Module):
         unpool1 = self.unpool1(dec2_1)
         cat1 = torch.cat((unpool1, enc1_2), dim=1)
         dec1_2 = self.dec1_2(cat1)
-        #dec1_1 = self.dec1_1(dec1_2)
         x = self.dec1_1(dec1_2)
+        #x = self.fc(x)
 
-        #x = self.fc(dec1_1)
-
-        return x
+        if self.use_semantic_label:
+            semantic_label = self.semantic_label_map1(dec1_2)
+            semantic_label = self.semantic_label_map2(semantic_label)
+            return x, semantic_label
+        else:
+            return x
