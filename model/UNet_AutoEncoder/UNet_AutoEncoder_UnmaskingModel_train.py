@@ -96,6 +96,10 @@ class UnmaskingModel(pl.LightningModule):
         unmask_predicted = self.generator(mask_img)
         return unmask_predicted
 
+    def predict(self, mask_img):
+        with torch.no_grad():
+            return self.forward(mask_img)
+
     def configure_optimizers(self):
         optim = torch.optim.Adam(self.parameters(), lr=self.lr)
         return optim
@@ -129,8 +133,9 @@ class UnmaskingModel(pl.LightningModule):
 
 class PrintImageCallback(Callback):
     def on_validation_epoch_end(self, trainer, pl_module):
-        input_grid = torchvision.utils.make_grid(torch.cat(pl_module.tensorboard_input_imgs), nrow=6, padding=2)
-        trainer.logger.experiment.add_image(f"UnmaskingModel_epoch:{trainer.current_epoch}_inputs", input_grid, trainer.current_epoch)
+        if trainer.current_epoch == 0:
+            input_grid = torchvision.utils.make_grid(torch.cat(pl_module.tensorboard_input_imgs), nrow=6, padding=2)
+            trainer.logger.experiment.add_image(f"UnmaskingModel_epoch:{trainer.current_epoch}_inputs", input_grid, trainer.current_epoch)
         
         pred_grid = torchvision.utils.make_grid(torch.cat(pl_module.tensorboard_pred_imgs), nrow=6, padding=2)
         trainer.logger.experiment.add_image(f"UnmaskingModel_epoch:{trainer.current_epoch}_predictions", pred_grid, trainer.current_epoch)
@@ -144,7 +149,7 @@ if __name__ == "__main__":
     parser.add_argument("--mask_img_folder", type=str, default="../data/celeba-mask-pair/mask_images/raw")
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--img_size", type=int, default=128)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--train_ratio", type=float, default=0.9)
     args = parser.parse_args()

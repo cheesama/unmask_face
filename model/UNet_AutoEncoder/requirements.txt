@@ -1,0 +1,4 @@
+pytorch_lightning
+torchvision
+fastapi
+tqdm

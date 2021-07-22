@@ -1,3 +1,0 @@
-dotmap
-torchvision
-pytorch-lightning
