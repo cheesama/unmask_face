@@ -16,7 +16,7 @@ def resize(input_image, target_image, height, width):
 
 
 def random_crop(input_image, target_image, IMG_HEIGHT=256, IMG_WIDTH=256):
-    stacked_image = tf.stack([input_image, real_image], axis=0)
+    stacked_image = tf.stack([input_image, target_image], axis=0)
     cropped_image = tf.image.random_crop(
         stacked_image, size=[2, IMG_HEIGHT, IMG_WIDTH, 3]
     )
@@ -128,7 +128,7 @@ def Generator():
     x = inputs
 
     skips = []
-    for down in down_stak:
+    for down in down_stack:
         x = down(x)
         skips.append(x)
 
@@ -140,4 +140,17 @@ def Generator():
 
     x = last(x)
 
-    return tf.keras.Mode(inputs=inputs, outputs=x)
+    return tf.keras.Model(inputs=inputs, outputs=x)
+
+def generator_loss_func(disc_gen_output, gen_output, target, loss_func, gen_loss_weight=100):
+    gan_loss = loss_func(tf.ones_like(disc_gen_output), disc_gen_output)
+
+    # mean absolute error
+    l1_loss = tf.reduce_mean(tf.abs(target - gen_output))
+    total_gen_loss = gan_loss + (gen_loss_weight * l1_loss)
+
+    return total_gen_loss, gan_loss, l1_loss
+
+    
+        
+
