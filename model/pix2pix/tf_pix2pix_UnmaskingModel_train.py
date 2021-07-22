@@ -1,6 +1,5 @@
 import tensorflow as tf
 
-
 def load_mask_pair_images(img_path):
     pass
 
