@@ -1,48 +1,67 @@
+from tensorflow.python.compiler.mlcompute import mlcompute
+#mlcompute.set_mlc_device(device_name="cpu")  # mac M1 optimized
+mlcompute.set_mlc_device(device_name="gpu")
+
 import tensorflow as tf
 
-def load_mask_pair_images(img_path):
-    pass
+import os, sys
+import argparse
+import time
+import datetime
 
 
-def resize(input_image, target_image, height, width):
-    input_image = tf.image.resize(
-        input_image, [height, width], method=tf.imgae.ResizeMethod.NEAREST_NEIGHBOR
+def load_image(img_path):
+    img = tf.io.read_file(img_path)
+    img = tf.image.decode_png(img)
+    img = tf.cast(img, tf.float32)
+
+    return img
+
+def load_image_train(img):
+    img = random_jitter(img)
+    img = normalize(img)
+
+    return img
+
+
+def load_image_test(img, IMG_HEIGHT=256, IMG_WIDTH=256):
+    img = resize(img, IMG_HEIGHT, IMG_WIDTH)
+    img = normalize(img)
+
+    return img
+
+
+def resize(img, height, width):
+    img = tf.image.resize(
+        img, [height, width], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
     )
-    target_image = tf.image.resize(
-        target_image, [height, width], method=tf.imgae.ResizeMethod.NEAREST_NEIGHBOR
-    )
-
-    return input_image, target_image
+    
+    return img
 
 
-def random_crop(input_image, target_image, IMG_HEIGHT=256, IMG_WIDTH=256):
-    stacked_image = tf.stack([input_image, target_image], axis=0)
-    cropped_image = tf.image.random_crop(
-        stacked_image, size=[2, IMG_HEIGHT, IMG_WIDTH, 3]
-    )
+def random_crop(img, IMG_HEIGHT=256, IMG_WIDTH=256):
+    img = tf.image.random_crop(img, size=[IMG_HEIGHT, IMG_WIDTH, 3])
 
-    return cropped_image[0], cropped_image[1]
+    return img
 
 
 # normalize iamge to [-1, 1]
-def normalize(input_image, target_image):
-    input_image = (input_image / 127.5) - 1
-    target_image = (target_image / 127.5) - 1
-
-    return input_image, target_image
+def normalize(img):
+    img = (img / 127.5) - 1
+    
+    return img
 
 
 @tf.function
-def random_jitter(input_image, target_image):
-    input_image, target_image = resize(input_image, target_image, 286, 286)
-    input_image, target_image = random_crop(input_image, target_image)
-
+def random_jitter(img):
+    img = resize(img, 286, 286)
+    img = random_crop(img, 256, 256)
+    
     if tf.random.uniform(()) > 0.5:
         # random mirroring
-        input_image = tf.image.flip_left_right(input_image)
-        target_image = tf.image.flip_left_right(target_image)
-
-    return input_image, target_image
+        img = tf.image.flip_left_right(img)
+        
+    return img
 
 
 def downsample(filters, size, apply_batchnorm=True):
@@ -55,7 +74,7 @@ def downsample(filters, size, apply_batchnorm=True):
             size,
             strides=2,
             padding="same",
-            kernal_initializer=initializer,
+            kernel_initializer=initializer,
             use_bias=False,
         )
     )
@@ -78,7 +97,7 @@ def upsample(filters, size, apply_dropout=False, dropout_ratio=0.5):
             size,
             strides=2,
             padding="same",
-            kernal_initializer=initializer,
+            kernel_initializer=initializer,
             use_bias=False,
         )
     )
@@ -89,7 +108,6 @@ def upsample(filters, size, apply_dropout=False, dropout_ratio=0.5):
     layers.add(tf.keras.layers.ReLU())
 
     return layers
-
 
 def Generator():
     inputs = tf.keras.layers.Input(shape=[256, 256, 3])
@@ -119,9 +137,9 @@ def Generator():
     last = tf.keras.layers.Conv2DTranspose(
         3,
         4,
-        stride=2,
+        strides=2,
         padding="same",
-        kernal_initializer=initializer,
+        kernel_initializer=initializer,
         activation="tanh",
     )
 
@@ -136,21 +154,123 @@ def Generator():
 
     for up, skip in zip(up_stack, skips):
         x = up(x)
-        x = tf.keras.concatenate()([x, skip])
+        #x = tf.keras.concatenate()([x, skip])
+        x += skip
 
     x = last(x)
 
-    return tf.keras.Model(inputs=inputs, outputs=x)
+    return tf.keras.Model(inputs=inputs, outputs=x, name='generator')
 
-def generator_loss_func(disc_gen_output, gen_output, target, loss_func, gen_loss_weight=100):
-    gan_loss = loss_func(tf.ones_like(disc_gen_output), disc_gen_output)
+def Discriminator():
+    initializer = tf.random_normal_initializer(0.0, 0.02)
 
-    # mean absolute error
-    l1_loss = tf.reduce_mean(tf.abs(target - gen_output))
-    total_gen_loss = gan_loss + (gen_loss_weight * l1_loss)
+    inputs = tf.keras.layers.Input(shape=[256, 256, 3])
+    targets = tf.keras.layers.Input(shape=[256, 256, 3])
 
-    return total_gen_loss, gan_loss, l1_loss
+    x = tf.keras.layers.concatenate([inputs, targets])  # (bs, 256, 256, channels*2)
 
+    down1 = downsample(64, 4, False)(x)  # (bs, 128, 128, 64)
+    down2 = downsample(128, 4)(down1)  # (bs, 64, 64, 128)
+    down3 = downsample(256, 4)(down2)  # (bs, 32, 32, 256)
+
+    zero_pad1 = tf.keras.layers.ZeroPadding2D()(down3)  # (bs, 34, 34, 256)
+    conv = tf.keras.layers.Conv2D(
+        512, 4, strides=1, kernel_initializer=initializer, use_bias=False
+    )(
+        zero_pad1
+    )  # (bs, 31, 31, 512)
+
+    batchnorm1 = tf.keras.layers.BatchNormalization()(conv)
+
+    leaky_relu = tf.keras.layers.LeakyReLU()(batchnorm1)
+
+    zero_pad2 = tf.keras.layers.ZeroPadding2D()(leaky_relu)  # (bs, 33, 33, 512)
+
+    last = tf.keras.layers.Conv2D(1, 4, strides=1, kernel_initializer=initializer)(
+        zero_pad2
+    )  # (bs, 30, 30, 1)
+
+    return tf.keras.Model(inputs=[inputs, targets], outputs=last, name='discriminator')
+
+def create_pix2pix_loss_func(unmask_inputs, gen_output, disc_output_real, disc_output_fake):
+    # create loss for discriminator
+    loss_func = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+    disc_loss1 = loss_func(tf.ones_like(disc_output_real), disc_output_real)
+    disc_loss2 = loss_func(tf.zeros_like(disc_output_fake), disc_output_fake)
+
+    # create loss for generator
+    gen_loss = tf.keras.losses.MAE(unmask_inputs, gen_output)
+
+    return (disc_loss1 + disc_loss2) + (2 * gen_loss) # loss value weighting
+
+def create_pix2pix_model(lr=1e-4, beta_1=0.5, beta_2=0.999):
+    generator = Generator()
+    discriminator = Discriminator()
+
+    mask_inputs = tf.keras.layers.Input(shape=[256, 256, 3], name='mask_inputs')
+    unmask_inputs = tf.keras.layers.Input(shape=[256, 256, 3], name='unmask_inputs')
     
-        
+    gen_output = generator(mask_inputs)
+    disc_output_real = discriminator([mask_inputs, unmask_inputs])
+    disc_output_fake = discriminator([mask_inputs, gen_output])
 
+    model = tf.keras.Model(inputs=[mask_inputs, unmask_inputs], outputs=[gen_output, unmask_inputs, disc_output_real, disc_output_fake])
+    model.add_loss(create_pix2pix_loss_func(unmask_inputs, gen_output, disc_output_real, disc_output_fake))
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr, beta_1=beta_1, beta_2=beta_2), run_eagerly=False)
+    model.summary()
+
+    return model
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--unmask_img_folder",
+        type=str,
+        default="../../data/celeba-mask-pair/unmask_images/raw",
+    )
+    parser.add_argument(
+        "--mask_img_folder",
+        type=str,
+        default="../../data/celeba-mask-pair/mask_images/raw",
+    )
+    parser.add_argument("--shuffle_size", type=int, default=400)
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--img_size", type=int, default=128)
+    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--train_ratio", type=float, default=0.9)
+    args = parser.parse_args()
+
+    unmask_dataset = tf.data.Dataset.list_files(
+        args.unmask_img_folder + "/*.png", shuffle=False
+    )
+    mask_dataset = tf.data.Dataset.list_files(
+        args.mask_img_folder + "/*.png", shuffle=False
+    )
+    dataset_length = len(mask_dataset)
+
+    unmask_dataset = unmask_dataset.map(load_image).map(load_image_train, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    mask_dataset = mask_dataset.map(load_image).map(load_image_test, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    full_dataset = tf.data.Dataset.zip((mask_dataset, unmask_dataset))
+    full_dataset = tf.data.Dataset.zip((full_dataset, unmask_dataset))
+    
+    train_dataset = (
+        full_dataset.take(int(args.train_ratio * dataset_length))
+        .batch(args.batch_size)
+        .prefetch(tf.data.experimental.AUTOTUNE)
+    )
+    val_dataset = (
+        full_dataset.skip(int(args.train_ratio * dataset_length))
+        .batch(args.batch_size)
+        .prefetch(tf.data.experimental.AUTOTUNE)
+    )
+
+    model = create_pix2pix_model(lr=args.lr)
+    model.fit(
+        train_dataset,
+        epochs=args.epochs,
+        steps_per_epoch=int(dataset_length / args.batch_size),
+        validation_data=val_dataset,
+        validation_steps=int(dataset_length / args.batch_size),
+    )
