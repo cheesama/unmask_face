@@ -35,7 +35,7 @@ def resize(img, height, width):
     img = tf.image.resize(
         img, [height, width], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR
     )
-    
+
     return img
 
 
@@ -48,7 +48,7 @@ def random_crop(img, IMG_HEIGHT=256, IMG_WIDTH=256):
 # normalize iamge to [-1, 1]
 def normalize(img):
     img = (img / 127.5) - 1
-    
+
     return img
 
 
@@ -56,11 +56,11 @@ def normalize(img):
 def random_jitter(img):
     img = resize(img, 286, 286)
     img = random_crop(img, 256, 256)
-    
+
     if tf.random.uniform(()) > 0.5:
         # random mirroring
         img = tf.image.flip_left_right(img)
-        
+
     return img
 
 
@@ -209,7 +209,7 @@ def create_pix2pix_model(lr=1e-4, beta_1=0.5, beta_2=0.999):
 
     mask_inputs = tf.keras.layers.Input(shape=[256, 256, 3], name='mask_inputs')
     unmask_inputs = tf.keras.layers.Input(shape=[256, 256, 3], name='unmask_inputs')
-    
+
     gen_output = generator(mask_inputs)
     disc_output_real = discriminator([mask_inputs, unmask_inputs])
     disc_output_fake = discriminator([mask_inputs, gen_output])
@@ -254,7 +254,7 @@ if __name__ == "__main__":
 
     full_dataset = tf.data.Dataset.zip((mask_dataset, unmask_dataset))
     full_dataset = tf.data.Dataset.zip((full_dataset, unmask_dataset))
-    
+
     train_dataset = (
         full_dataset.take(int(args.train_ratio * dataset_length))
         .batch(args.batch_size)
@@ -266,6 +266,9 @@ if __name__ == "__main__":
         .prefetch(tf.data.experimental.AUTOTUNE)
     )
 
+    # register callback
+    tensorboard_callback = tf.keras.callbacks.Tensorboard(log_dir='./logs')
+
     model = create_pix2pix_model(lr=args.lr)
     model.fit(
         train_dataset,
@@ -273,4 +276,5 @@ if __name__ == "__main__":
         steps_per_epoch=int(dataset_length / args.batch_size),
         validation_data=val_dataset,
         validation_steps=int(dataset_length / args.batch_size),
+        callbacks=[tensorboard_callback]
     )
