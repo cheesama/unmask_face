@@ -1,4 +1,4 @@
-from tensorflow.python.compiler.mlcompute import mlcompute
+#from tensorflow.python.compiler.mlcompute import mlcompute
 #mlcompute.set_mlc_device(device_name="cpu")  # mac M1 optimized
 #mlcompute.set_mlc_device(device_name="gpu")
 
