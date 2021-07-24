@@ -1,6 +1,6 @@
 from tensorflow.python.compiler.mlcompute import mlcompute
 #mlcompute.set_mlc_device(device_name="cpu")  # mac M1 optimized
-mlcompute.set_mlc_device(device_name="gpu")
+#mlcompute.set_mlc_device(device_name="gpu")
 
 import tensorflow as tf
 
