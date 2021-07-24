@@ -267,7 +267,7 @@ if __name__ == "__main__":
     )
 
     # register callback
-    tensorboard_callback = tf.keras.callbacks.Tensorboard(log_dir='./logs')
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir='./logs')
 
     model = create_pix2pix_model(lr=args.lr)
     model.fit(
