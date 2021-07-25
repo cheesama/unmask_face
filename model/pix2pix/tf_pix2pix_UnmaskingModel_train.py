@@ -201,7 +201,15 @@ def create_pix2pix_loss_func(unmask_inputs, gen_output, disc_output_real, disc_o
     # create loss for generator
     gen_loss = tf.keras.losses.MAE(unmask_inputs, gen_output)
 
-    return (disc_loss1 + disc_loss2) + (2 * gen_loss) # loss value weighting
+    #return (disc_loss1 + disc_loss2) + (2 * gen_loss) # loss value weighting
+    loss = (disc_loss1 + disc_loss2) + (2 * gen_loss)
+
+    return {
+        'loss': loss,
+        'disc_real_loss': disc_loss1,
+        'disc_fake_loss': disc_loss2,
+        'gen_loss': gen_loss,
+    }
 
 def create_pix2pix_model(lr=1e-4, beta_1=0.5, beta_2=0.999):
     generator = Generator()
@@ -267,7 +275,11 @@ if __name__ == "__main__":
     )
 
     # register callback
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir='./logs')
+    logdir = './logs'
+    file_writer = tf.summary.create_file_writer(logdir)
+    file_writer.set_as_default()
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=logdir)
+    image_writer_callback = tf.summary.create_file_writer(logdir + os.sep + 'images')
 
     model = create_pix2pix_model(lr=args.lr)
     model.fit(
