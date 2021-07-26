@@ -1,4 +1,7 @@
 pytorch_lightning
 torchvision
 fastapi
+uvicorn
+python-multipart
+aiofiles
 tqdm

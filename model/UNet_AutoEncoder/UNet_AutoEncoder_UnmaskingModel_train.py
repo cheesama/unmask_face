@@ -192,7 +192,7 @@ class MaskingDataModule(pl.LightningDataModule):
         
 # model definition
 class UnmaskingModel(pl.LightningModule):
-    def __init__(self, lr=1e-4):
+    def __init__(self, lr=1e-4, img_size=128):
         super(UnmaskingModel, self).__init__()
         self.lr = lr
         self.generator = UNet()
