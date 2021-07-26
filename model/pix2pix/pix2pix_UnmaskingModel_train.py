@@ -1,6 +1,7 @@
 from pytorch_lightning import callbacks
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
+from torchvision.transforms.functional import to_pil_image
 from PIL import Image
 from tqdm.auto import tqdm
 from pytorch_lightning.callbacks import ModelCheckpoint, Callback
@@ -244,8 +245,8 @@ class MaskDataset(Dataset):
             self.unmask_img_folder
             + os.sep
             + self.file_names[idx].replace(self.mask_postfix, "")
-        )
-        mask_img = Image.open(self.mask_img_folder + os.sep + self.file_names[idx])
+        ).convert('RGB')
+        mask_img = Image.open(self.mask_img_folder + os.sep + self.file_names[idx]).convert('RGB')
 
         unmask_img_tensor = self.transform(unmask_img)
         mask_img_tensor = self.transform(mask_img)
@@ -343,9 +344,13 @@ class UnmaskingModel(pl.LightningModule):
         
         return gen_unmask_predicted, disc_unmask_predicted
 
+    def denormalize(self, image, std=0.5, mean=0.5):
+        return image * std + mean
+        
     def predict(self, mask_img):
         with torch.no_grad():
-            return self.forward(mask_img)[0]
+            unmask_img_predicted, _ = self.forward(mask_img)
+            return self.denormalize(unmask_img_predicted)
 
     def configure_optimizers(self):
         optim = torch.optim.Adam(self.parameters(), lr=self.lr)
@@ -385,8 +390,8 @@ class UnmaskingModel(pl.LightningModule):
             self.log("val_loss", loss)
 
             if batch_idx % 3000 == 0:
-                self.tensorboard_input_imgs.append(mask_img)
-                self.tensorboard_pred_imgs.append(gen_unmask_predicted)
+                self.tensorboard_input_imgs.append(self.denormalize(mask_img))
+                self.tensorboard_pred_imgs.append(self.denormalize(gen_unmask_predicted))
 
             return loss
 
@@ -395,7 +400,7 @@ class PrintImageCallback(Callback):
     def on_validation_epoch_end(self, trainer, pl_module):
         if trainer.current_epoch == 0:
             input_grid = torchvision.utils.make_grid(
-                torch.cat(pl_module.tensorboard_input_imgs), nrow=6, padding=2
+                torch.cat(pl_module.tensorboard_input_imgs), nrow=4, padding=2
             )
             trainer.logger.experiment.add_image(
                 f"UnmaskingModel_epoch:{trainer.current_epoch}_inputs",
@@ -404,7 +409,7 @@ class PrintImageCallback(Callback):
             )
 
         pred_grid = torchvision.utils.make_grid(
-            torch.cat(pl_module.tensorboard_pred_imgs), nrow=6, padding=2
+            torch.cat(pl_module.tensorboard_pred_imgs), nrow=4, padding=2
         )
         trainer.logger.experiment.add_image(
             f"UnmaskingModel_epoch:{trainer.current_epoch}_predictions",
