@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { Camera } from 'expo-camera';
+import { Icon } from 'react-native-elements'
 
 let camera: Camera;
 
@@ -42,9 +43,10 @@ export default function App() {
                         }}
                     >
                         
-                        <Text style={styles.text}> Flip </Text>
-                        <Text 
-                            style={styles.text_right}
+                        <Icon name='flip' reverse> Flip </Icon>
+                        <Icon 
+                            reverse
+                            name='camera'  
                             onPress={async () => {
                                 if(!camera) return;
                                 const photo = await camera.takePictureAsync();
@@ -52,7 +54,7 @@ export default function App() {
                             }}
                         >
                             Shot 
-                        </Text>
+                        </Icon>
                     </TouchableOpacity>
                 </View>
             </Camera>
@@ -78,14 +80,4 @@ const styles = StyleSheet.create({
       alignSelf: 'flex-end',
       alignItems: 'center',
     },
-    text: {
-      fontSize: 40,
-      color: 'black',
-    },
-    text_right: {
-        fontSize: 60,
-        color: 'black',
-        position: 'absolute',
-        right: -800,
-    }
 });
