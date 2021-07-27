@@ -5,6 +5,7 @@ from torchvision.transforms.functional import to_pil_image
 from PIL import Image
 from tqdm.auto import tqdm
 from pytorch_lightning.callbacks import ModelCheckpoint, Callback
+from pytorch_lightning import seed_everything
 
 import torch
 import torch.nn as nn
@@ -436,6 +437,8 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--train_ratio", type=float, default=0.9)
     args = parser.parse_args()
+
+    seed_everything(2021)
 
     # model preparation
     model = UnmaskingModel(lr=args.lr)
