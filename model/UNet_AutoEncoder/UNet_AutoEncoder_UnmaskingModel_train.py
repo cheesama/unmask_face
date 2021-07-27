@@ -132,7 +132,7 @@ class UNet(nn.Module):
 # dataset definition
 class MaskDataset(Dataset):
     def __init__(
-        self, unmask_img_folder, mask_img_folder, img_size=128, mask_postfix='_cloth', transform=None
+        self, unmask_img_folder, mask_img_folder, img_size=256, mask_postfix='_cloth', transform=None
     ):
         self.unmask_img_folder = unmask_img_folder
         self.mask_img_folder = mask_img_folder
@@ -164,7 +164,7 @@ class MaskDataset(Dataset):
         return mask_img_tensor, unmask_img_tensor, semantic_target
 
 class MaskingDataModule(pl.LightningDataModule):
-    def __init__(self, unmask_img_folder, mask_img_folder, batch_size, train_ratio=0.8, img_size=128, mask_postfix='_cloth', transform=None):
+    def __init__(self, unmask_img_folder, mask_img_folder, batch_size, train_ratio=0.8, img_size=256, mask_postfix='_cloth', transform=None):
         super(MaskingDataModule, self).__init__()
         self.unmask_img_folder = unmask_img_folder
         self.mask_img_folder = mask_img_folder
@@ -192,7 +192,7 @@ class MaskingDataModule(pl.LightningDataModule):
         
 # model definition
 class UnmaskingModel(pl.LightningModule):
-    def __init__(self, lr=1e-4, img_size=128):
+    def __init__(self, lr=1e-4, img_size=256):
         super(UnmaskingModel, self).__init__()
         self.lr = lr
         self.generator = UNet()
@@ -261,7 +261,7 @@ if __name__ == "__main__":
     parser.add_argument("--unmask_img_folder", type=str, default="../../data/celeba-mask-pair/unmask_images/raw")
     parser.add_argument("--mask_img_folder", type=str, default="../../data/celeba-mask-pair/mask_images/raw")
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--img_size", type=int, default=128)
+    parser.add_argument("--img_size", type=int, default=256)
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--train_ratio", type=float, default=0.9)

@@ -233,7 +233,7 @@ class MaskDataset(Dataset):
         else:
             self.transform = transforms.Compose([
                 transforms.ToTensor(),
-                transforms.Normalize([0.5,0.5,0.5],[0.5,0.5,0.5]),
+                #transforms.Normalize([0.5,0.5,0.5],[0.5,0.5,0.5]),
                 transforms.Resize((img_size,img_size))
             ])
 
@@ -245,18 +245,13 @@ class MaskDataset(Dataset):
             self.unmask_img_folder
             + os.sep
             + self.file_names[idx].replace(self.mask_postfix, "")
-        ).convert('RGB')
-        mask_img = Image.open(self.mask_img_folder + os.sep + self.file_names[idx]).convert('RGB')
+        )
+        mask_img = Image.open(self.mask_img_folder + os.sep + self.file_names[idx])
 
         unmask_img_tensor = self.transform(unmask_img)
         mask_img_tensor = self.transform(mask_img)
-        semantic_target = (
-            ((mask_img_tensor == unmask_img_tensor).float().sum(dim=0) == 3.0)
-            .float()
-            .unsqueeze(0)
-        )
-
-        return mask_img_tensor, unmask_img_tensor, semantic_target
+        
+        return mask_img_tensor, unmask_img_tensor
 
 
 class MaskingDataModule(pl.LightningDataModule):
@@ -359,7 +354,7 @@ class UnmaskingModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         self.generator.train()
 
-        mask_img, unmask_img, semantic_target = batch
+        mask_img, unmask_img = batch
         gen_unmask_predicted, disc_unmask_predicted = self.forward(mask_img)
 
         gen_loss = self.gen_loss_func(gen_unmask_predicted, unmask_img)
@@ -377,7 +372,7 @@ class UnmaskingModel(pl.LightningModule):
         self.generator.eval()
 
         with torch.no_grad():
-            mask_img, unmask_img, semantic_target = batch
+            mask_img, unmask_img = batch
             gen_unmask_predicted, disc_unmask_predicted = self.forward(mask_img)
 
             gen_loss = self.gen_loss_func(gen_unmask_predicted, unmask_img)
@@ -390,8 +385,10 @@ class UnmaskingModel(pl.LightningModule):
             self.log("val_loss", loss)
 
             if batch_idx % 3000 == 0:
-                self.tensorboard_input_imgs.append(self.denormalize(mask_img))
-                self.tensorboard_pred_imgs.append(self.denormalize(gen_unmask_predicted))
+                #self.tensorboard_input_imgs.append(self.denormalize(mask_img))
+                #self.tensorboard_pred_imgs.append(self.denormalize(gen_unmask_predicted))
+                self.tensorboard_input_imgs.append(mask_img)
+                self.tensorboard_pred_imgs.append(gen_unmask_predicted)
 
             return loss
 
