@@ -225,10 +225,6 @@ def create_pix2pix_model(lr=1e-4, beta_1=0.5, beta_2=0.999):
 
     return model
 
-logdir = './logs'
-file_writer = tf.summary.create_file_writer(logdir)
-file_writer.set_as_default()
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -247,7 +243,11 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--train_ratio", type=float, default=0.9)
+    parser.add_argument("--logdir", type=str, default='./logs')
     args = parser.parse_args()
+
+    file_writer = tf.summary.create_file_writer(args.logdir)
+    file_writer.set_as_default()
 
     unmask_dataset = tf.data.Dataset.list_files(
         args.unmask_img_folder + "/*.png", shuffle=False
@@ -276,7 +276,7 @@ if __name__ == "__main__":
 
     # register callback
     
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=logdir)
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=args.logdir)
     
     model = create_pix2pix_model(lr=args.lr)
     model.fit(
