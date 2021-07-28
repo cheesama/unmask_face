@@ -251,6 +251,10 @@ class MaskDataset(Dataset):
 
         unmask_img_tensor = self.transform(unmask_img)
         mask_img_tensor = self.transform(mask_img)
+
+        # normalize images
+        unmask_img_tensor = unmask_img_tensor / 127.5 - 1
+        mask_img_tensor = mask_img_tensor / 127.5 - 1
         
         return mask_img_tensor, unmask_img_tensor
 
@@ -386,10 +390,10 @@ class UnmaskingModel(pl.LightningModule):
             self.log("val_loss", loss)
 
             if batch_idx % 3000 == 0:
-                #self.tensorboard_input_imgs.append(self.denormalize(mask_img))
-                #self.tensorboard_pred_imgs.append(self.denormalize(gen_unmask_predicted))
-                self.tensorboard_input_imgs.append(mask_img)
-                self.tensorboard_pred_imgs.append(gen_unmask_predicted)
+                self.tensorboard_input_imgs.append(self.denormalize(mask_img))
+                self.tensorboard_pred_imgs.append(self.denormalize(gen_unmask_predicted))
+                #self.tensorboard_input_imgs.append(mask_img)
+                #self.tensorboard_pred_imgs.append(gen_unmask_predicted)
 
             return loss
 

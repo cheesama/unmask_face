@@ -14,16 +14,26 @@ model = None
 
 app = FastAPI()
 
+print ('model loading ...')
 model = UnmaskingModel.load_from_checkpoint('UNet_AutoEncoder_UnmaskingModel.ckpt')
+print ('model load done ...')
+
 #img_size = model.img_size
 img_size=128
 prediction_transform = transforms.Compose([
     transforms.Resize((img_size, img_size)),
     transforms.ToTensor()
 ])
+
+@app.get('/')
+async def health():
+    if model is not None:
+        return {'status' : 200}
+
+    return { 'status': 400 }
     
 @app.post("/unmasking", response_class=FileResponse)
-async def create_file(file: bytes = File(...)):
+async def generate_unmask_image(file: bytes = File(...)):
     img = Image.open(io.BytesIO(file)).convert('RGB')
     img = prediction_transform(img)
     if len(img.size()) < 4:
