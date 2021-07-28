@@ -246,8 +246,8 @@ class MaskDataset(Dataset):
             self.unmask_img_folder
             + os.sep
             + self.file_names[idx].replace(self.mask_postfix, "")
-        )
-        mask_img = Image.open(self.mask_img_folder + os.sep + self.file_names[idx])
+        ).convert('RGB')
+        mask_img = Image.open(self.mask_img_folder + os.sep + self.file_names[idx]).convert('RGB')
 
         unmask_img_tensor = self.transform(unmask_img)
         mask_img_tensor = self.transform(mask_img)
