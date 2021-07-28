@@ -430,7 +430,9 @@ class PrintImageCallback(Callback):
             os.system(f'cp {pl_module.ckpt_name}.ckpt {pl_module.ckpt_name}-epoch:{trainer.current_epoch}.ckpt')
             files.download(f'{pl_module.ckpt_name}-epoch:{trainer.current_epoch}.ckpt')
             print (f'{trainer.current_epoch}-th checkpoint file downloaded!')
-        except Exception as e: 
+        except Exception as e:
+            print ()
+            print (e) 
             print ('ckpt file download fail: not colab env or ckpt file does not exist!')
 
 if __name__ == "__main__":
