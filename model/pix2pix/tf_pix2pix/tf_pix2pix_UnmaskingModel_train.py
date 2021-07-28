@@ -234,12 +234,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--unmask_img_folder",
         type=str,
-        default="../../data/celeba-mask-pair/unmask_images/raw",
+        default="../../../data/celeba-mask-pair/unmask_images/raw",
     )
     parser.add_argument(
         "--mask_img_folder",
         type=str,
-        default="../../data/celeba-mask-pair/mask_images/raw",
+        default="../../../data/celeba-mask-pair/mask_images/raw",
     )
     parser.add_argument("--shuffle_size", type=int, default=400)
     parser.add_argument("--batch_size", type=int, default=32)

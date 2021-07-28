@@ -234,7 +234,7 @@ class MaskDataset(Dataset):
         else:
             self.transform = transforms.Compose([
                 transforms.ToTensor(),
-                #transforms.Normalize([0.5,0.5,0.5],[0.5,0.5,0.5]),
+                transforms.Normalize([0.5,0.5,0.5],[0.5,0.5,0.5]),
                 transforms.Resize((img_size,img_size))
             ])
 
@@ -314,8 +314,9 @@ class MaskingDataModule(pl.LightningDataModule):
 
 # model definition
 class UnmaskingModel(pl.LightningModule):
-    def __init__(self, gen_loss_weight=100, lr=2e-4, beta1=0.5, beta2=0.999, img_size=256):
+    def __init__(self, ckpt_name, gen_loss_weight=100, lr=2e-4, beta1=0.5, beta2=0.999, img_size=256):
         super(UnmaskingModel, self).__init__()
+        self.ckpt_name = ckpt_name
         self.gen_loss_weight = gen_loss_weight
         self.lr = lr
         self.generator = UNet()
@@ -390,10 +391,10 @@ class UnmaskingModel(pl.LightningModule):
             self.log("val_loss", loss)
 
             if batch_idx % 3000 == 0:
-                #self.tensorboard_input_imgs.append(self.denormalize(mask_img))
-                #self.tensorboard_pred_imgs.append(self.denormalize(gen_unmask_predicted))
-                self.tensorboard_input_imgs.append(mask_img)
-                self.tensorboard_pred_imgs.append(gen_unmask_predicted)
+                self.tensorboard_input_imgs.append(self.denormalize(mask_img))
+                self.tensorboard_pred_imgs.append(self.denormalize(gen_unmask_predicted))
+                #self.tensorboard_input_imgs.append(mask_img)
+                #self.tensorboard_pred_imgs.append(gen_unmask_predicted)
 
             return loss
 
@@ -422,6 +423,14 @@ class PrintImageCallback(Callback):
         pl_module.tensorboard_input_imgs = []
         pl_module.tensorboard_pred_imgs = []
 
+        # backup colab ckpt file(in case of colab training)
+        try:
+            from google.colab import files
+            files.download(f'{pl_module.ckpt_name}.ckpt')
+            print (f'{trainer.current_epoch}-th checkpoint file downloaded!')
+        except:
+            pass
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -437,15 +446,16 @@ if __name__ == "__main__":
     )
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--img_size", type=int, default=256)
-    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--epochs", type=int, default=300)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--train_ratio", type=float, default=0.9)
+    parser.add_argument("--ckpt_name", type=str, default='pix2pix_UnmaskingModel')
     args = parser.parse_args()
 
     seed_everything(2021)
 
     # model preparation
-    model = UnmaskingModel(lr=args.lr)
+    model = UnmaskingModel(lr=args.lr, ckpt_name=args.ckpt_name)
 
     # data module preparation
     dataset = MaskingDataModule(
@@ -460,17 +470,26 @@ if __name__ == "__main__":
     checkpoint_callback = ModelCheckpoint(
         monitor="val_loss",
         dirpath="./",
-        filename="pix2pix_UnmaskingModel",
+        filename=args.ckpt_name,
         save_top_k=1,
         mode="min",
     )
 
     # training
-    trainer = pl.Trainer(
-        gpus=torch.cuda.device_count(),
-        progress_bar_refresh_rate=1,
-        max_epochs=args.epochs,
-        accelerator="ddp",
-        callbacks=[checkpoint_callback, PrintImageCallback()],
-    )
+    if os.path.exists(f'{args.ckpt_name}.ckpt'):
+        trainer = pl.Trainer(
+            resume_from_checkpoint=f'{args.ckpt_name}.ckpt',
+            progress_bar_refresh_rate=1,
+            max_epochs=args.epochs,
+            accelerator="ddp",
+            callbacks=[checkpoint_callback, PrintImageCallback()],
+        )    
+    else:
+        trainer = pl.Trainer(
+            gpus=torch.cuda.device_count(),
+            progress_bar_refresh_rate=1,
+            max_epochs=args.epochs,
+            accelerator="ddp",
+            callbacks=[checkpoint_callback, PrintImageCallback()],
+        )
     trainer.fit(model, dataset)
