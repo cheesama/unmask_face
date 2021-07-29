@@ -339,19 +339,22 @@ class UnmaskingModel(pl.LightningModule):
         if class_name.find('Conv') != -1:
             nn.init.normal_(model.weight.data, 0.0, 0.02)
 
-    def forward(self, mask_img):
+    def forward(self, mask_img, unmask_img=None):
         gen_unmask_predicted = self.generator(mask_img)
-        disc_fake_predicted = self.discriminator(mask_img, gen_unmask_predicted)
-        disc_real_predicted = self.discriminator(mask_img, gen_unmask_predicted)
+        if unmask_img is not None:
+            disc_fake_predicted = self.discriminator(mask_img, gen_unmask_predicted)
+            disc_real_predicted = self.discriminator(mask_img, unmask_img)
         
-        return gen_unmask_predicted, disc_fake_predicted, disc_real_predicted
+            return gen_unmask_predicted, disc_fake_predicted, disc_real_predicted
+        
+        return gen_unmask_predicted
 
     def denormalize(self, image, std=0.5, mean=0.5):
         return image * std + mean
         
     def predict(self, mask_img):
         with torch.no_grad():
-            unmask_img_predicted, _, _ = self.forward(mask_img)
+            unmask_img_predicted = self.forward(mask_img)
             return self.denormalize(unmask_img_predicted)
 
     def configure_optimizers(self):
@@ -362,7 +365,7 @@ class UnmaskingModel(pl.LightningModule):
         self.generator.train()
 
         mask_img, unmask_img = batch
-        gen_unmask_predicted, disc_fake_predicted, disc_real_predicted = self.forward(mask_img)
+        gen_unmask_predicted, disc_fake_predicted, disc_real_predicted = self.forward(mask_img, unmask_img)
 
         gen_loss = self.gen_loss_func(gen_unmask_predicted, unmask_img)
         disc_fake_loss = self.disc_loss_func(disc_fake_predicted, torch.zeros_like(disc_fake_predicted))
@@ -370,7 +373,7 @@ class UnmaskingModel(pl.LightningModule):
 
         loss = gen_loss * self.gen_loss_weight + disc_fake_loss + disc_real_loss
 
-        self.log("train/gen_loss", gen_loss)
+        self.log("train/gen_loss", gen_loss * self.gen_loss_weight)
         self.log("train/disc_fake_loss", disc_fake_loss)
         self.log("train/disc_real_loss", disc_real_loss)
         self.log("loss", loss)
@@ -382,7 +385,7 @@ class UnmaskingModel(pl.LightningModule):
 
         with torch.no_grad():
             mask_img, unmask_img = batch
-            gen_unmask_predicted, disc_fake_predicted, disc_real_predicted = self.forward(mask_img)
+            gen_unmask_predicted, disc_fake_predicted, disc_real_predicted = self.forward(mask_img, unmask_img)
 
             gen_loss = self.gen_loss_func(gen_unmask_predicted, unmask_img)
             disc_fake_loss = self.disc_loss_func(disc_fake_predicted, torch.zeros_like(disc_fake_predicted))
@@ -390,7 +393,7 @@ class UnmaskingModel(pl.LightningModule):
 
             loss = gen_loss * self.gen_loss_weight + disc_fake_loss + disc_real_loss
 
-            self.log("val/gen_loss", gen_loss)
+            self.log("val/gen_loss", gen_loss * self.gen_loss_weight)
             self.log("val/disc_fake_loss", disc_fake_loss)
             self.log("val/disc_real_loss", disc_real_loss)
             self.log("val_loss", loss)
