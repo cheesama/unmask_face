@@ -200,11 +200,8 @@ def create_pix2pix_loss_func(unmask_inputs, gen_output, disc_output_real, disc_o
     # create loss for generator
     gen_loss = tf.keras.losses.MAE(unmask_inputs, gen_output)
 
-    #tf.summary.scalar('disc_real_loss', disc_loss1, model.optimizer.iterations.numpy)
-    #tf.summary.scalar('disc_fake_loss', disc_loss2, model.optimizer.iterations.numpy)
-    #tf.summary.scalar('gen_loss', gen_loss, model.optimizer.iterations.numpy)
-    
     return (disc_loss1 + disc_loss2) + (2 * gen_loss) # loss value weighting
+    #return disc_loss1, disc_loss2, gen_loss
 
 
 def create_pix2pix_model(lr=1e-4, beta_1=0.5, beta_2=0.999):
@@ -220,7 +217,7 @@ def create_pix2pix_model(lr=1e-4, beta_1=0.5, beta_2=0.999):
 
     model = tf.keras.Model(inputs=[mask_inputs, unmask_inputs], outputs=[gen_output, unmask_inputs, disc_output_real, disc_output_fake])
     model.add_loss(create_pix2pix_loss_func(unmask_inputs, gen_output, disc_output_real, disc_output_fake))
-    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr, beta_1=beta_1, beta_2=beta_2), run_eagerly=False)
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr, beta_1=beta_1, beta_2=beta_2), run_eagerly=False)#, loss_weights=[0.25,0.25,0.5])
     model.summary()
 
     return model

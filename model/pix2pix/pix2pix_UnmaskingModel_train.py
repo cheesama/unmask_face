@@ -341,16 +341,17 @@ class UnmaskingModel(pl.LightningModule):
 
     def forward(self, mask_img):
         gen_unmask_predicted = self.generator(mask_img)
-        disc_unmask_predicted = self.discriminator(mask_img, gen_unmask_predicted)
+        disc_fake_predicted = self.discriminator(mask_img, gen_unmask_predicted)
+        disc_real_predicted = self.discriminator(mask_img, gen_unmask_predicted)
         
-        return gen_unmask_predicted, disc_unmask_predicted
+        return gen_unmask_predicted, disc_fake_predicted, disc_real_predicted
 
     def denormalize(self, image, std=0.5, mean=0.5):
         return image * std + mean
         
     def predict(self, mask_img):
         with torch.no_grad():
-            unmask_img_predicted, _ = self.forward(mask_img)
+            unmask_img_predicted, _, _ = self.forward(mask_img)
             return self.denormalize(unmask_img_predicted)
 
     def configure_optimizers(self):
@@ -361,15 +362,17 @@ class UnmaskingModel(pl.LightningModule):
         self.generator.train()
 
         mask_img, unmask_img = batch
-        gen_unmask_predicted, disc_unmask_predicted = self.forward(mask_img)
+        gen_unmask_predicted, disc_fake_predicted, disc_real_predicted = self.forward(mask_img)
 
         gen_loss = self.gen_loss_func(gen_unmask_predicted, unmask_img)
-        disc_loss = self.disc_loss_func(disc_unmask_predicted, torch.ones_like(disc_unmask_predicted))
+        disc_fake_loss = self.disc_loss_func(disc_fake_predicted, torch.zeros_like(disc_fake_predicted))
+        disc_real_loss = self.disc_loss_func(disc_real_predicted, torch.ones_like(disc_real_predicted))
 
-        loss = gen_loss * self.gen_loss_weight + disc_loss
+        loss = gen_loss * self.gen_loss_weight + disc_fake_loss + disc_real_loss
 
-        self.log("gen_loss", gen_loss)
-        self.log("disc_loss", disc_loss)
+        self.log("train/gen_loss", gen_loss)
+        self.log("train/disc_fake_loss", disc_fake_loss)
+        self.log("train/disc_real_loss", disc_real_loss)
         self.log("loss", loss)
 
         return loss
@@ -379,15 +382,17 @@ class UnmaskingModel(pl.LightningModule):
 
         with torch.no_grad():
             mask_img, unmask_img = batch
-            gen_unmask_predicted, disc_unmask_predicted = self.forward(mask_img)
+            gen_unmask_predicted, disc_fake_predicted, disc_real_predicted = self.forward(mask_img)
 
             gen_loss = self.gen_loss_func(gen_unmask_predicted, unmask_img)
-            disc_loss = self.disc_loss_func(torch.ones_like(disc_unmask_predicted), disc_unmask_predicted)
+            disc_fake_loss = self.disc_loss_func(disc_fake_predicted, torch.zeros_like(disc_fake_predicted))
+            disc_real_loss = self.disc_loss_func(disc_real_predicted, torch.ones_like(disc_real_predicted))
 
-            loss = gen_loss * self.gen_loss_weight + disc_loss
+            loss = gen_loss * self.gen_loss_weight + disc_fake_loss + disc_real_loss
 
-            self.log("val_gen_loss", gen_loss)
-            self.log("val_disc_loss", disc_loss)
+            self.log("val/gen_loss", gen_loss)
+            self.log("val/disc_fake_loss", disc_fake_loss)
+            self.log("val/disc_real_loss", disc_real_loss)
             self.log("val_loss", loss)
 
             if batch_idx % 3000 == 0:
@@ -431,7 +436,7 @@ class PrintImageCallback(Callback):
             files.download(f'{pl_module.ckpt_name}-epoch:{trainer.current_epoch}.ckpt')
             print (f'{trainer.current_epoch}-th checkpoint file downloaded!')
         except Exception as e:
-            print ()
+            print (f"\n{os.sytem('pwd')}")
             print (e) 
             print ('ckpt file download fail: not colab env or ckpt file does not exist!')
 
