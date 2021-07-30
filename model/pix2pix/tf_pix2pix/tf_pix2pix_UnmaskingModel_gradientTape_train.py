@@ -161,7 +161,6 @@ def Generator():
 
     return tf.keras.Model(inputs=inputs, outputs=x, name="generator")
 
-
 def Discriminator():
     initializer = tf.random_normal_initializer(0.0, 0.02)
 
@@ -221,6 +220,29 @@ class Pix2Pix(tf.keras.Model):
 
         return gen_img
 
+@tf.function
+def train_step(model, mask_imgs, unmask_imgs, optimizer):
+    with tf.GradientTape() as tape:
+        gen_img, disc_real_output, disc_fake_output = model(mask_imgs, unmask_imgs)
+
+        gen_loss = tf.reduce_mean(model.gen_loss_func(unmask_imgs, gen_img))
+        disc_real_loss = model.disc_loss_func(
+            tf.ones_like(disc_real_output), disc_real_output
+        )
+        disc_fake_loss = model.disc_loss_func(
+            tf.zeros_like(disc_fake_output), disc_fake_output
+        )
+        loss = (
+            gen_loss * model.gen_loss_weight + disc_real_loss + disc_fake_loss
+        )
+
+        grads = tape.gradient(loss, model.trainable_weights)
+        optimizer.apply_gradients(zip(grads, model.trainable_weights))
+
+    tf.summary.scalar("train/gen_loss", gen_loss, step=optimizer.iterations)
+    tf.summary.scalar("train/disc_real_loss", disc_real_loss, step=optimizer.iterations)
+    tf.summary.scalar("train/disc_fake_loss", disc_fake_loss, step=optimizer.iterations)
+    tf.summary.scalar("loss", loss, step=optimizer.iterations)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -235,12 +257,13 @@ if __name__ == "__main__":
         default="../../../data/celeba-mask-pair/mask_images/raw",
     )
     parser.add_argument("--shuffle_size", type=int, default=400)
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--img_size", type=int, default=256)
-    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--epochs", type=int, default=300)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--train_ratio", type=float, default=0.9)
     parser.add_argument("--logdir", type=str, default="./logs")
+    parser.add_argument("--ckpt_name", type=str, default="tf_pix2pix_UnmaskingModel")
     args = parser.parse_args()
 
     summary_writer = tf.summary.create_file_writer(args.logdir)
@@ -290,33 +313,10 @@ if __name__ == "__main__":
             total=(dataset_length - int(args.train_ratio * dataset_length))
             // args.batch_size,
         ):
-            with tf.GradientTape() as tape:
-                gen_img, disc_real_output, disc_fake_output = model(
-                    mask_imgs, unmask_imgs
-                )
+            train_step(model, mask_imgs, unmask_imgs, optimizer)
 
-                gen_loss = tf.reduce_mean(model.gen_loss_func(unmask_imgs, gen_img))
-                disc_real_loss = model.disc_loss_func(
-                    tf.ones_like(disc_real_output), disc_real_output
-                )
-                disc_fake_loss = model.disc_loss_func(
-                    tf.zeros_like(disc_fake_output), disc_fake_output
-                )
-                loss = (
-                    gen_loss * model.gen_loss_weight + disc_real_loss + disc_fake_loss
-                )
-
-                grads = tape.gradient(loss, model.trainable_weights)
-                optimizer.apply_gradients(zip(grads, model.trainable_weights))
-
-                tf.summary.scalar("train/gen_loss", gen_loss, step=optimizer.iterations)
-                tf.summary.scalar(
-                    "train/disc_real_loss", disc_real_loss, step=optimizer.iterations
-                )
-                tf.summary.scalar(
-                    "train/disc_fake_loss", disc_fake_loss, step=optimizer.iterations
-                )
-                tf.summary.scalar("loss", loss, step=optimizer.iterations)
+            if optimizer.iterations % 50 == 0:
+                model.save(f'{args.ckpt_name}_savedModel')
 
         # Iterate over the batches of the valid dataset.
         gen_loss, disc_real_loss, disc_fake_loss, loss = None, None, None, None
@@ -341,6 +341,7 @@ if __name__ == "__main__":
 
                 tf.summary.image(f'validation_input_imgs:epoch_{epoch}', mask_imgs, max_outputs=4, step=epoch)
                 tf.summary.image(f'validation_gen_imgs:epoch_{epoch}', gen_img, max_outputs=4, step=epoch)
+
             else:
                 gen_loss = tf.concat(
                     [

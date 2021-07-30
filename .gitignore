@@ -109,3 +109,4 @@ dist
 **/__pycache__/
 **/.expo
 **/*.ckpt
+**/*_savedModel
