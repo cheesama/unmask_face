@@ -16,6 +16,7 @@ import numpy as np
 import argparse
 import os, sys
 import multiprocessing
+import subprocess
 
 # generator architecture
 class UNet(nn.Module):
@@ -314,9 +315,11 @@ class MaskingDataModule(pl.LightningDataModule):
 
 # model definition
 class UnmaskingModel(pl.LightningModule):
-    def __init__(self, ckpt_name, gen_loss_weight=100, lr=2e-4, beta1=0.5, beta2=0.999, img_size=256):
+    def __init__(self, ckpt_name, ckpt_bucket_name=None, gen_loss_weight=100, lr=2e-4, beta1=0.5, beta2=0.999, img_size=256):
         super(UnmaskingModel, self).__init__()
         self.ckpt_name = ckpt_name
+        self.ckpt_bucket_name = ckpt_bucket_name
+
         self.gen_loss_weight = gen_loss_weight
         self.lr = lr
         self.generator = UNet()
@@ -431,17 +434,11 @@ class PrintImageCallback(Callback):
         pl_module.tensorboard_input_imgs = []
         pl_module.tensorboard_pred_imgs = []
 
-        # backup colab ckpt file(in case of colab training)
-        try:
-            from google.colab import files
-            files.download(f'{pl_module.ckpt_name}.ckpt')
-            os.system(f'cp {pl_module.ckpt_name}.ckpt {pl_module.ckpt_name}-epoch:{trainer.current_epoch}.ckpt')
-            files.download(f'{pl_module.ckpt_name}-epoch:{trainer.current_epoch}.ckpt')
-            print (f'{trainer.current_epoch}-th checkpoint file downloaded!')
-        except Exception as e:
-            print (f"\n{os.system('pwd')}")
-            print (e) 
-            print ('ckpt file download fail: not colab env or ckpt file does not exist!')
+        # backup ckpt file in aws s3(if s3 env exists)
+        if os.environ.get('AWS_SHARED_CREDENTIALS_FILE') is not None:
+            os.system(f'cp {pl_module.ckpt_name}.ckpt {pl_module.ckpt_name}_epoch:{trainer.current_epoch}.ckpt')
+            os.system(f'aws s3 cp {pl_module.ckpt_name}.ckpt s3://{pl_module.ckpt_bucket_name}/pix2pix/')
+            os.system(f'aws s3 cp {pl_module.ckpt_name}_epoch:{trainer.current_epoch}.ckpt s3://{pl_module.ckpt_bucket_name}/pix2pix/')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -461,12 +458,13 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--train_ratio", type=float, default=0.9)
     parser.add_argument("--ckpt_name", type=str, default='pix2pix_UnmaskingModel')
+    parser.add_argument("--ckpt_bucket_name", type=str, default=None)
     args = parser.parse_args()
 
     seed_everything(2021)
 
     # model preparation
-    model = UnmaskingModel(lr=args.lr, ckpt_name=args.ckpt_name)
+    model = UnmaskingModel(lr=args.lr, ckpt_name=args.ckpt_name, ckpt_bucket_name=args.ckpt_bucket_name)
 
     # data module preparation
     dataset = MaskingDataModule(
@@ -503,4 +501,5 @@ if __name__ == "__main__":
             accelerator="ddp",
             callbacks=[checkpoint_callback, PrintImageCallback()],
         )
+
     trainer.fit(model, dataset)
