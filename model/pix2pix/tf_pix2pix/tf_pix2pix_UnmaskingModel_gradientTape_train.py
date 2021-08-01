@@ -244,6 +244,26 @@ def train_step(model, mask_imgs, unmask_imgs, optimizer):
     tf.summary.scalar("train/disc_fake_loss", disc_fake_loss, step=optimizer.iterations)
     tf.summary.scalar("loss", loss, step=optimizer.iterations)
 
+@tf.function
+def valid_step(model, mask_imgs, unmask_imgs, step):
+    gen_img, disc_real_output, disc_fake_output = model(mask_imgs, unmask_imgs)
+
+    gen_loss = tf.reduce_mean(model.gen_loss_func(unmask_imgs, gen_img))
+    disc_real_loss = model.disc_loss_func(
+        tf.ones_like(disc_real_output), disc_real_output
+    )
+    disc_fake_loss = model.disc_loss_func(
+        tf.zeros_like(disc_fake_output), disc_fake_output
+    )
+    loss = (
+        gen_loss * model.gen_loss_weight + disc_real_loss + disc_fake_loss
+    )
+
+    tf.summary.scalar("valid/gen_loss", gen_loss, step=step)
+    tf.summary.scalar("valid/disc_real_loss", disc_real_loss, step=step)
+    tf.summary.scalar("valid/disc_fake_loss", disc_fake_loss, step=step)
+    tf.summary.scalar("val_loss", loss, step=step)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -303,6 +323,7 @@ if __name__ == "__main__":
     optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
 
     # Iterate over epochs.
+    valid_glob_step = 0
     for epoch in tqdm(range(args.epochs), desc="epochs"):
         print("Start of epoch {}".format(epoch))
 
@@ -310,12 +331,13 @@ if __name__ == "__main__":
         for step, (mask_imgs, unmask_imgs) in tqdm(
             enumerate(train_dataset),
             desc="train_steps",
-            total=(dataset_length - int(args.train_ratio * dataset_length))
-            // args.batch_size,
+            total=int(args.train_ratio * dataset_length) // args.batch_size,
         ):
             train_step(model, mask_imgs, unmask_imgs, optimizer)
 
-            if optimizer.iterations % 50 == 0:
+            if step % 2000 == 0:
+                model.save(f'{args.ckpt_name}_epoch:{epoch}_step:{step}_savedModel')
+                os.system(f'rm -rf {args.ckpt_name}_savedModel')
                 model.save(f'{args.ckpt_name}_savedModel')
 
         # Iterate over the batches of the valid dataset.
@@ -325,64 +347,5 @@ if __name__ == "__main__":
             desc="valid_steps",
             total=(dataset_length - int(args.train_ratio * dataset_length)) // args.batch_size,
         ):
-            gen_img, disc_real_output, disc_fake_output = model(mask_imgs, unmask_imgs)
-
-            if step == 0:
-                gen_loss = tf.reduce_mean(model.gen_loss_func(unmask_imgs, gen_img))
-                disc_real_loss = model.disc_loss_func(
-                    tf.ones_like(disc_real_output), disc_real_output
-                )
-                disc_fake_loss = model.disc_loss_func(
-                    tf.zeros_like(disc_fake_output), disc_fake_output
-                )
-                loss = (
-                    gen_loss * model.gen_loss_weight + disc_real_loss + disc_fake_loss
-                )
-
-                tf.summary.image(f'validation_input_imgs:epoch_{epoch}', mask_imgs, max_outputs=4, step=epoch)
-                tf.summary.image(f'validation_gen_imgs:epoch_{epoch}', gen_img, max_outputs=4, step=epoch)
-
-            else:
-                gen_loss = tf.concat(
-                    [
-                        gen_loss,
-                        tf.reduce_mean(model.gen_loss_func(unmask_imgs, gen_img)),
-                    ],
-                    axis=0,
-                )
-                disc_real_loss = tf.concat(
-                    [
-                        disc_real_loss,
-                        model.disc_loss_func(
-                            tf.ones_like(disc_real_output), disc_real_output
-                        ),
-                    ],
-                    axis=0,
-                )
-                disc_fake_loss = tf.concat(
-                    [
-                        disc_fake_loss,
-                        model.disc_loss_func(
-                            tf.zeros_like(disc_fake_output), disc_fake_output
-                        ),
-                    ],
-                    axis=0,
-                )
-                loss = tf.concat(
-                    [
-                        loss,
-                        gen_loss * model.gen_loss_weight
-                        + disc_real_loss
-                        + disc_fake_loss,
-                    ],
-                    axis=0,
-                )
-
-        tf.summary.scalar("val/gen_loss_avg", tf.reduce_mean(gen_loss), step=epoch)
-        tf.summary.scalar(
-            "val/disc_real_loss_avg", tf.reduce_mean(disc_real_loss), step=epoch
-        )
-        tf.summary.scalar(
-            "val/disc_fake_loss_avg", tf.reduce_mean(disc_fake_loss), step=epoch
-        )
-        tf.summary.scalar("val_loss_avg", tf.reduce_mean(loss), step=epoch)
+            valid_glob_step += 1
+            valid_step(model, mask_imgs, unmask_imgs, valid_glob_step)

@@ -488,6 +488,7 @@ if __name__ == "__main__":
     if os.path.exists(f'{args.ckpt_name}.ckpt'):
         trainer = pl.Trainer(
             resume_from_checkpoint=f'{args.ckpt_name}.ckpt',
+            gpus=torch.cuda.device_count(),
             progress_bar_refresh_rate=1,
             max_epochs=args.epochs,
             accelerator="ddp",
