@@ -319,8 +319,14 @@ if __name__ == "__main__":
         .prefetch(tf.data.experimental.AUTOTUNE)
     )
 
-    model = Pix2Pix()
-    optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
+    # load savedModel if exist
+    if os.path.exists(args.ckpt_name):
+        model = tf.keras.models.load_model(args.ckpt_name)
+        optimizer = model.optimizer
+    else:
+        model = Pix2Pix()
+        optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
+        model.compile(optimizer=optimizer)
 
     # Iterate over epochs.
     valid_glob_step = 0
