@@ -118,8 +118,8 @@ class UNet(nn.Module):
 
         self.dec1_2 = CBR2d(in_channels=2 * 64, out_channels=64)
         self.dec1_1 = CBR2d(in_channels=64, out_channels=3)
-
-        # self.fc = nn.Conv2d(in_channels=64, out_channels=1, kernel_size=1, stride=1, padding=0, bias=True)
+        
+        self.tanh = nn.Tanh()
 
     def forward(self, x):
         enc1_1 = self.enc1_1(x)
@@ -161,7 +161,7 @@ class UNet(nn.Module):
         cat1 = torch.cat((unpool1, enc1_2), dim=1)
         dec1_2 = self.dec1_2(cat1)
         x = self.dec1_1(dec1_2)
-        # x = self.fc(x)
+        x = self.tanh(x)
 
         return x
 
