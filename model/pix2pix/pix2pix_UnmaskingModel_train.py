@@ -234,9 +234,9 @@ class MaskDataset(Dataset):
             self.transform = transform
         else:
             self.transform = transforms.Compose([
+                transforms.Resize((img_size,img_size)),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5,0.5,0.5],[0.5,0.5,0.5]),
-                transforms.Resize((img_size,img_size))
             ])
 
     def __len__(self):
