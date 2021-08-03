@@ -109,4 +109,5 @@ dist
 **/__pycache__/
 **/.expo
 **/*.ckpt
+**/*.ipynb_checkpoints
 **/*_savedModel

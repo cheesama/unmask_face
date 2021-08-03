@@ -249,16 +249,12 @@ class MaskDataset(Dataset):
             self.unmask_img_folder
             + os.sep
             + self.file_names[idx].replace(self.mask_postfix, "")
-        ).convert('RGB')
-        mask_img = Image.open(self.mask_img_folder + os.sep + self.file_names[idx]).convert('RGB')
+        )
+        mask_img = Image.open(self.mask_img_folder + os.sep + self.file_names[idx])
 
         unmask_img_tensor = self.transform(unmask_img)
         mask_img_tensor = self.transform(mask_img)
 
-        # normalize images
-        #unmask_img_tensor = unmask_img_tensor / 127.5 - 1
-        #mask_img_tensor = mask_img_tensor / 127.5 - 1
-        
         return mask_img_tensor, unmask_img_tensor
 
 
@@ -364,7 +360,7 @@ class UnmaskingModel(pl.LightningModule):
 
     def configure_optimizers(self):
         optim = torch.optim.Adam(self.parameters(), lr=self.lr)
-        lr_scheduler = ReduceLROnPlateau(optim, 'min', patience=2, verbose=True)
+        lr_scheduler = ReduceLROnPlateau(optim, 'min', patience=2, factor=0.5, verbose=True)
         
         return {'optimizer': optim, 'lr_scheduler': lr_scheduler, 'monitor': 'val/gen_loss'}
 
@@ -418,7 +414,7 @@ class PrintImageCallback(Callback):
     def on_validation_epoch_end(self, trainer, pl_module):
         if trainer.current_epoch == 0:
             input_grid = torchvision.utils.make_grid(
-                torch.cat(pl_module.tensorboard_input_imgs), nrow=4, padding=2
+                torch.cat(pl_module.tensorboard_input_imgs), nrow=4, padding=4, normalize=True
             )
             trainer.logger.experiment.add_image(
                 f"UnmaskingModel_epoch:{trainer.current_epoch}_inputs",
@@ -427,7 +423,7 @@ class PrintImageCallback(Callback):
             )
 
         pred_grid = torchvision.utils.make_grid(
-            torch.cat(pl_module.tensorboard_pred_imgs), nrow=4, padding=2
+            torch.cat(pl_module.tensorboard_pred_imgs), nrow=4, padding=4, normalize=True
         )
         trainer.logger.experiment.add_image(
             f"UnmaskingModel_epoch:{trainer.current_epoch}_predictions",
@@ -459,7 +455,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--img_size", type=int, default=256)
     parser.add_argument("--epochs", type=int, default=300)
-    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--train_ratio", type=float, default=0.9)
     parser.add_argument("--ckpt_name", type=str, default='pix2pix_UnmaskingModel')
     parser.add_argument("--ckpt_bucket_name", type=str, default=None)
