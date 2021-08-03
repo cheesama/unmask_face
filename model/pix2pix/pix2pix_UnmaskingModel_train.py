@@ -1,5 +1,7 @@
 from pytorch_lightning import callbacks
+from torch.optim import lr_scheduler
 from torch.utils.data import Dataset, DataLoader
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchvision import transforms
 from torchvision.transforms.functional import to_pil_image
 from PIL import Image
@@ -362,7 +364,9 @@ class UnmaskingModel(pl.LightningModule):
 
     def configure_optimizers(self):
         optim = torch.optim.Adam(self.parameters(), lr=self.lr)
-        return optim
+        lr_scheduler = ReduceLROnPlateau(optim, 'min', patience=2, verbose=True)
+        
+        return {'optimizer': optim, 'lr_scheduler': lr_scheduler, 'monitor': 'val/gen_loss'}
 
     def training_step(self, batch, batch_idx):
         self.generator.train()
