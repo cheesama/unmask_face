@@ -51,6 +51,7 @@ def normalize(img):
 
     return img
 
+
 # denormalize image to [0, 255]
 def denormalize(img):
     img = (img + 1) * 127.5
@@ -168,6 +169,7 @@ def Generator():
 
     return tf.keras.Model(inputs=inputs, outputs=x, name="generator")
 
+
 def Discriminator():
     initializer = tf.random_normal_initializer(0.0, 0.02)
 
@@ -227,6 +229,7 @@ class Pix2Pix(tf.keras.Model):
 
         return denormalize(gen_img)
 
+
 @tf.function
 def train_step(model, mask_imgs, unmask_imgs, optimizer):
     with tf.GradientTape() as tape:
@@ -239,9 +242,7 @@ def train_step(model, mask_imgs, unmask_imgs, optimizer):
         disc_fake_loss = model.disc_loss_func(
             tf.zeros_like(disc_fake_output), disc_fake_output
         )
-        loss = (
-            gen_loss * model.gen_loss_weight + disc_real_loss + disc_fake_loss
-        )
+        loss = gen_loss * model.gen_loss_weight + disc_real_loss + disc_fake_loss
 
         grads = tape.gradient(loss, model.trainable_weights)
         optimizer.apply_gradients(zip(grads, model.trainable_weights))
@@ -250,6 +251,7 @@ def train_step(model, mask_imgs, unmask_imgs, optimizer):
     tf.summary.scalar("train/disc_real_loss", disc_real_loss, step=optimizer.iterations)
     tf.summary.scalar("train/disc_fake_loss", disc_fake_loss, step=optimizer.iterations)
     tf.summary.scalar("loss", loss, step=optimizer.iterations)
+
 
 @tf.function
 def valid_step(model, mask_imgs, unmask_imgs, step):
@@ -262,14 +264,13 @@ def valid_step(model, mask_imgs, unmask_imgs, step):
     disc_fake_loss = model.disc_loss_func(
         tf.zeros_like(disc_fake_output), disc_fake_output
     )
-    loss = (
-        gen_loss * model.gen_loss_weight + disc_real_loss + disc_fake_loss
-    )
+    loss = gen_loss * model.gen_loss_weight + disc_real_loss + disc_fake_loss
 
     tf.summary.scalar("valid/gen_loss", gen_loss, step=step)
     tf.summary.scalar("valid/disc_real_loss", disc_real_loss, step=step)
     tf.summary.scalar("valid/disc_fake_loss", disc_fake_loss, step=step)
     tf.summary.scalar("val_loss", loss, step=step)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -331,11 +332,11 @@ if __name__ == "__main__":
     if os.path.exists(args.ckpt_name):
         model = tf.keras.models.load_model(args.ckpt_name)
         optimizer = model.optimizer
-        optimizer = mixed_precision.LossScaleOptimizer(optimizer, loss_scale='dynamic')
+        optimizer = mixed_precision.LossScaleOptimizer(optimizer, loss_scale="dynamic")
     else:
         model = Pix2Pix()
         optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
-        optimizer = mixed_precision.LossScaleOptimizer(optimizer, loss_scale='dynamic')
+        optimizer = mixed_precision.LossScaleOptimizer(optimizer, loss_scale="dynamic")
         model.compile(optimizer=optimizer)
 
     # Iterate over epochs.
@@ -352,19 +353,22 @@ if __name__ == "__main__":
             train_step(model, mask_imgs, unmask_imgs, optimizer)
 
             if step % 2000 == 0 and step != 0:
-                model.save(f'{args.ckpt_name}_epoch:{epoch}_step:{step}_savedModel')
-                if os.environ.get('AWS_SHARED_CREDENTIALS_FILE') is not None:
-                    os.system(f'aws s3 cp {args.ckpt_name}_epoch:{epoch}_step:{step}_savedModel s3://{args.ckpt_bucket_name}/pix2pix/')
+                model.save(f"{args.ckpt_name}_epoch:{epoch}_step:{step}_savedModel")
+                if os.environ.get("AWS_SHARED_CREDENTIALS_FILE") is not None:
+                    os.system(
+                        f"aws s3 cp --recursive {args.ckpt_name}_epoch:{epoch}_step:{step}_savedModel s3://{args.ckpt_bucket_name}/pix2pix/{args.ckpt_name}_epoch:{epoch}_step:{step}_savedModel"
+                    )
 
-                os.system(f'rm -rf {args.ckpt_name}_savedModel')
-                model.save(f'{args.ckpt_name}_savedModel')
+                os.system(f"rm -rf {args.ckpt_name}_savedModel")
+                model.save(f"{args.ckpt_name}_savedModel")
 
         # Iterate over the batches of the valid dataset.
         gen_loss, disc_real_loss, disc_fake_loss, loss = None, None, None, None
         for step, (mask_imgs, unmask_imgs) in tqdm(
             enumerate(val_dataset),
             desc="valid_steps",
-            total=(dataset_length - int(args.train_ratio * dataset_length)) // args.batch_size,
+            total=(dataset_length - int(args.train_ratio * dataset_length))
+            // args.batch_size,
         ):
             valid_glob_step += 1
             valid_step(model, mask_imgs, unmask_imgs, valid_glob_step)
