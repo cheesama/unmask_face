@@ -1,4 +1,5 @@
 from tqdm.auto import tqdm
+from tensorflow.keras.mixed_precision import experimental as mixed_precision
 
 import tensorflow as tf
 
@@ -44,9 +45,15 @@ def random_crop(img, IMG_HEIGHT=256, IMG_WIDTH=256):
     return img
 
 
-# normalize iamge to [-1, 1]
+# normalize image to [-1, 1]
 def normalize(img):
     img = (img / 127.5) - 1
+
+    return img
+
+# denormalize image to [0, 255]
+def denormalize(img):
+    img = (img + 1) * 127.5
 
     return img
 
@@ -218,7 +225,7 @@ class Pix2Pix(tf.keras.Model):
             """
             return gen_img, disc_output_real, disc_output_fake
 
-        return gen_img
+        return denormalize(gen_img)
 
 @tf.function
 def train_step(model, mask_imgs, unmask_imgs, optimizer):
@@ -324,9 +331,11 @@ if __name__ == "__main__":
     if os.path.exists(args.ckpt_name):
         model = tf.keras.models.load_model(args.ckpt_name)
         optimizer = model.optimizer
+        optimizer = mixed_precision.LossScaleOptimizer(optimizer, loss_scale='dynamic')
     else:
         model = Pix2Pix()
         optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
+        optimizer = mixed_precision.LossScaleOptimizer(optimizer, loss_scale='dynamic')
         model.compile(optimizer=optimizer)
 
     # Iterate over epochs.
@@ -342,7 +351,7 @@ if __name__ == "__main__":
         ):
             train_step(model, mask_imgs, unmask_imgs, optimizer)
 
-            if step % 2000 == 0:
+            if step % 2000 == 0 and step != 0:
                 model.save(f'{args.ckpt_name}_epoch:{epoch}_step:{step}_savedModel')
                 if os.environ.get('AWS_SHARED_CREDENTIALS_FILE') is not None:
                     os.system(f'aws s3 cp {args.ckpt_name}_epoch:{epoch}_step:{step}_savedModel s3://{args.ckpt_bucket_name}/pix2pix/')
