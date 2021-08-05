@@ -300,6 +300,7 @@ class MaskingDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=multiprocessing.cpu_count(),
+            pin_memory=True
         )
 
     def val_dataloader(self):
@@ -354,9 +355,10 @@ class UnmaskingModel(pl.LightningModule):
         return image * std + mean
         
     def predict(self, mask_img):
+        self.generator.eval()
         with torch.no_grad():
-            unmask_img_predicted = self.forward(mask_img)
-            return self.denormalize(unmask_img_predicted)
+            gen_unmask_predicted = self.generator(mask_img)
+            return self.denormalize(gen_unmask_predicted)
 
     def configure_optimizers(self):
         optim = torch.optim.Adam(self.parameters(), lr=self.lr)
@@ -487,6 +489,7 @@ if __name__ == "__main__":
     # training
     if os.path.exists(f'{args.ckpt_name}.ckpt'):
         trainer = pl.Trainer(
+            precision=16,
             resume_from_checkpoint=f'{args.ckpt_name}.ckpt',
             gpus=torch.cuda.device_count(),
             progress_bar_refresh_rate=1,
@@ -496,6 +499,7 @@ if __name__ == "__main__":
         )    
     else:
         trainer = pl.Trainer(
+            precision=16,
             gpus=torch.cuda.device_count(),
             progress_bar_refresh_rate=1,
             max_epochs=args.epochs,

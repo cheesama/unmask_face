@@ -280,10 +280,11 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--img_size", type=int, default=256)
     parser.add_argument("--epochs", type=int, default=300)
-    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--train_ratio", type=float, default=0.9)
     parser.add_argument("--logdir", type=str, default="./logs")
     parser.add_argument("--ckpt_name", type=str, default="tf_pix2pix_UnmaskingModel")
+    parser.add_argument("--ckpt_bucket_name", type=str)
     args = parser.parse_args()
 
     summary_writer = tf.summary.create_file_writer(args.logdir)
@@ -343,6 +344,9 @@ if __name__ == "__main__":
 
             if step % 2000 == 0:
                 model.save(f'{args.ckpt_name}_epoch:{epoch}_step:{step}_savedModel')
+                if os.environ.get('AWS_SHARED_CREDENTIALS_FILE') is not None:
+                    os.system(f'aws s3 cp {args.ckpt_name}_epoch:{epoch}_step:{step}_savedModel s3://{args.ckpt_bucket_name}/pix2pix/')
+
                 os.system(f'rm -rf {args.ckpt_name}_savedModel')
                 model.save(f'{args.ckpt_name}_savedModel')
 
