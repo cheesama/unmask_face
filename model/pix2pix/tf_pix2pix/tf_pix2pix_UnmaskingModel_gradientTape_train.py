@@ -242,10 +242,13 @@ def train_step(model, mask_imgs, unmask_imgs, optimizer):
         disc_fake_loss = model.disc_loss_func(
             tf.zeros_like(disc_fake_output), disc_fake_output
         )
-        loss = gen_loss * model.gen_loss_weight + disc_real_loss + disc_fake_loss
 
-        grads = tape.gradient(loss, model.trainable_weights)
-        optimizer.apply_gradients(zip(grads, model.trainable_weights))
+        loss = gen_loss * model.gen_loss_weight + disc_real_loss + disc_fake_loss
+        scaled_loss = optimizer.get_scaled_loss(loss)
+
+    scaled_grads = tape.gradient(loss, model.trainable_weights)
+    grads = optimizer.get_unscaled_gradients(scaled_grads)
+    optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
     tf.summary.scalar("train/gen_loss", gen_loss, step=optimizer.iterations)
     tf.summary.scalar("train/disc_real_loss", disc_real_loss, step=optimizer.iterations)
@@ -332,11 +335,11 @@ if __name__ == "__main__":
     if os.path.exists(args.ckpt_name):
         model = tf.keras.models.load_model(args.ckpt_name)
         optimizer = model.optimizer
-        optimizer = mixed_precision.LossScaleOptimizer(optimizer, loss_scale="dynamic")
+        optimizer = mixed_precision.LossScaleOptimizer(optimizer)
     else:
         model = Pix2Pix()
         optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
-        optimizer = mixed_precision.LossScaleOptimizer(optimizer, loss_scale="dynamic")
+        optimizer = mixed_precision.LossScaleOptimizer(optimizer)
         model.compile(optimizer=optimizer)
 
     # Iterate over epochs.
