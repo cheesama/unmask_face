@@ -1,6 +1,6 @@
 from tqdm.auto import tqdm
-from tensorflow.keras.mixed_precision import experimental as mixed_precision
 
+import tensorflow.keras.mixed_precision as mixed_precision
 import tensorflow as tf
 
 import os, sys
