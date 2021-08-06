@@ -479,11 +479,12 @@ if __name__ == "__main__":
 
     # register callbacks
     checkpoint_callback = ModelCheckpoint(
-        monitor="val_loss",
         dirpath="./",
         filename=args.ckpt_name,
-        save_top_k=1,
-        mode="min",
+        save_last=True,
+        #monitor="val_loss",
+        #save_top_k=1,
+        #mode="min",
     )
 
     # training
