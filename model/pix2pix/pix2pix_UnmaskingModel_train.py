@@ -327,7 +327,7 @@ class UnmaskingModel(pl.LightningModule):
         self.generator.apply(self.initialize_weights)
         self.discriminator.apply(self.initialize_weights)
 
-        self.disc_loss_func = nn.BCELoss()
+        self.disc_loss_func = nn.BCEWithLogitsLoss()
         self.gen_loss_func = nn.L1Loss()
         
         self.tensorboard_input_imgs = []
