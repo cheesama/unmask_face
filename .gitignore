@@ -111,3 +111,4 @@ dist
 **/*.ckpt
 **/*.ipynb_checkpoints
 **/*_savedModel
+**/checkpoints/

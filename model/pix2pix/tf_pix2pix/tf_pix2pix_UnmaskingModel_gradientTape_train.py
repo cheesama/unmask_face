@@ -255,6 +255,11 @@ def train_step(model, mask_imgs, unmask_imgs, optimizer):
     tf.summary.scalar("train/disc_fake_loss", disc_fake_loss, step=optimizer.iterations)
     tf.summary.scalar("loss", loss, step=optimizer.iterations)
 
+    if optimizer.iterations != 0 and optimizer.iterations % 1000 == 0:
+        tf.summary.image(f"train/gen-unmask-img", gen_img, step=optimizer.iterations)
+
+    return loss
+
 
 @tf.function
 def valid_step(model, mask_imgs, unmask_imgs, step):
@@ -291,7 +296,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--img_size", type=int, default=256)
     parser.add_argument("--epochs", type=int, default=300)
-    parser.add_argument("--lr", type=float, default=2e-4)
+    parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--train_ratio", type=float, default=0.9)
     parser.add_argument("--logdir", type=str, default="./logs")
     parser.add_argument("--ckpt_name", type=str, default="tf_pix2pix_UnmaskingModel")
@@ -331,19 +336,21 @@ if __name__ == "__main__":
         .prefetch(tf.data.experimental.AUTOTUNE)
     )
 
-    # load savedModel if exist
-    if os.path.exists(args.ckpt_name):
-        model = tf.keras.models.load_model(args.ckpt_name)
-        optimizer = model.optimizer
-        optimizer = mixed_precision.LossScaleOptimizer(optimizer)
-    else:
-        model = Pix2Pix()
-        optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
-        optimizer = mixed_precision.LossScaleOptimizer(optimizer)
-        model.compile(optimizer=optimizer)
+    model = Pix2Pix()
+    optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
+    optimizer = mixed_precision.LossScaleOptimizer(optimizer)
+    model.compile(optimizer=optimizer)
+
+    ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=optimizer, net=model)
+    manager = tf.train.CheckpointManager(ckpt, './checkpoints', max_to_keep=3)
 
     # Iterate over epochs.
-    valid_glob_step = 0
+    ckpt.restore(manager.latest_checkpoint)
+    if manager.latest_checkpoint:
+        print("Restored from {}".format(manager.latest_checkpoint))
+    else:
+        print("Initializing from scratch.")
+
     for epoch in tqdm(range(args.epochs), desc="epochs"):
         print("Start of epoch {}".format(epoch))
 
@@ -353,17 +360,14 @@ if __name__ == "__main__":
             desc="train_steps",
             total=int(args.train_ratio * dataset_length) // args.batch_size,
         ):
-            train_step(model, mask_imgs, unmask_imgs, optimizer)
+            loss = train_step(model, mask_imgs, unmask_imgs, optimizer)
 
-            if step % 2000 == 0 and step != 0:
-                model.save(f"{args.ckpt_name}_epoch:{epoch}_step:{step}_savedModel")
-                if os.environ.get("AWS_SHARED_CREDENTIALS_FILE") is not None:
-                    os.system(
-                        f"aws s3 cp --recursive {args.ckpt_name}_epoch:{epoch}_step:{step}_savedModel s3://{args.ckpt_bucket_name}/pix2pix/{args.ckpt_name}_epoch:{epoch}_step:{step}_savedModel"
-                    )
-
-                os.system(f"rm -rf {args.ckpt_name}_savedModel")
-                model.save(f"{args.ckpt_name}_savedModel")
+            ckpt.step.assign_add(1)
+            if int(ckpt.step) % 1000 == 0 and ckpt.step > 0:
+                save_path = manager.save()
+                print("Saved checkpoint for step {}: {}".format(int(ckpt.step), save_path))
+                print("loss {:1.2f}".format(loss.numpy()))
+                model.generator.save(f"{args.ckpt_name}_generator_savedModel")
 
         # Iterate over the batches of the valid dataset.
         gen_loss, disc_real_loss, disc_fake_loss, loss = None, None, None, None
@@ -373,5 +377,4 @@ if __name__ == "__main__":
             total=(dataset_length - int(args.train_ratio * dataset_length))
             // args.batch_size,
         ):
-            valid_glob_step += 1
-            valid_step(model, mask_imgs, unmask_imgs, valid_glob_step)
+            valid_step(model, mask_imgs, unmask_imgs, tf.cast(ckpt.step, tf.int32))

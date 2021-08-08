@@ -481,7 +481,7 @@ if __name__ == "__main__":
     checkpoint_callback = ModelCheckpoint(
         dirpath="./",
         filename=args.ckpt_name,
-        save_last=True,
+        #save_last=True,
         #monitor="val_loss",
         #save_top_k=1,
         #mode="min",
