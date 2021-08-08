@@ -1,18 +1,27 @@
 import React, { Component, useState } from 'react';
 import { Text, View, StyleSheet, Image, Button } from 'react-native';
-import { Constants } from 'expo';
 import { ImageEditor } from "expo-image-editor";
 import * as ImagePicker from "expo-image-picker";
+import * as Permissions from 'expo-permissions'
+import { createAppContainer } from 'react-navigation';
+import { createStackNavigator } from 'react-navigation-stack';
 
 const App = () => {
   const [imageUri, setImageUri] = useState(undefined);
   const [croppedUri, setCroppedUri] = useState(undefined);
   const [editorVisible, setEditorVisible] = useState(false);
   const [aspectLock, setAspectLock] = useState(false);
+
+  const launchEditor = (uri: string) => {
+    // Then set the image uri
+    setImageUri(uri);
+    // And set the image editor to be visible
+    setEditorVisible(true);
+  };
   
   const selectPhoto = async () => {
     // Get the permission to access the camera roll
-    const response = await ImagePicker.requestCameraRollPermissionsAsync();
+    const response = await ImagePicker.requestMediaLibraryPermissionsAsync();
     // If they said yes then launch the image picker
     if (response.granted) {
       const pickerResult = await ImagePicker.launchImageLibraryAsync();
@@ -28,20 +37,27 @@ const App = () => {
     }
   };
 
-  const launchEditor = (uri: string) => {
-    // Then set the image uri
-    setImageUri(uri);
-    // And set the image editor to be visible
-    setEditorVisible(true);
+  const takePhoto = async () => {
+    const response = await ImagePicker.requestCameraPermissionsAsync();
+    if (response.status === 'granted') {
+      let image = await ImagePicker.launchCameraAsync({
+				mediaTypes: ImagePicker.MediaTypeOptions.Images,
+				allowsEditing: true,
+				aspect: [3, 3],
+				quality: 1,
+				base64: true,
+			})
+
+      setImageUri(image.uri);
+    }
   };
 
   return (
-    <View>
+    <View style={{ flexDirection: 'column', justifyContent: 'center', alignItems: 'center', }}>
       <Image
         style={{ height: 300, width: 300 }}
         source={{ uri: imageUri }}
       />
-      <Button title="Select Photo" onPress={() => selectPhoto()} />
       <ImageEditor
         visible={editorVisible}
         onCloseEditor={() => setEditorVisible(false)}
@@ -57,7 +73,8 @@ const App = () => {
         }}
         mode="full"
       />
-      <Button color="#ff5c5c" title="Take Picture"  />
+      <Button title="Select Photo" onPress={() => selectPhoto()} />
+      <Button color="#ff5c5c" title="Take Photo"  onPress={() => takePhoto()} />
       
   </View>
   );
