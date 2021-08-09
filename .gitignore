@@ -112,3 +112,4 @@ dist
 **/*.ipynb_checkpoints
 **/*_savedModel
 **/checkpoints/
+**/*.onnx

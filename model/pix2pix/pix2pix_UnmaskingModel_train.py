@@ -411,6 +411,15 @@ class UnmaskingModel(pl.LightningModule):
 
             return loss
 
+class SaveGeneratorAsOnnxCallback(Callback):
+    def on_validation_epoch_end(self, trainer, pl_module):
+        model = pl_module.generator
+        model.eval()
+        torch.onnx.export(model, torch.randn(1, 3, 256, 256), "pix2pix_generator.onnx", verbose=True)
+
+        # backup ckpt file in aws s3(if s3 env exists)
+        if os.environ.get('AWS_SHARED_CREDENTIALS_FILE') is not None:
+            os.system(f'aws s3 cp pix2pix_generator.onnx s3://{pl_module.ckpt_bucket_name}/pix2pix/pix2pix_generator.onnx')
 
 class PrintImageCallback(Callback):
     def on_validation_epoch_end(self, trainer, pl_module):
@@ -496,7 +505,7 @@ if __name__ == "__main__":
             progress_bar_refresh_rate=1,
             max_epochs=args.epochs,
             accelerator="ddp",
-            callbacks=[checkpoint_callback, PrintImageCallback()],
+            callbacks=[checkpoint_callback, PrintImageCallback(), SaveGeneratorAsOnnxCallback()],
         )    
     else:
         trainer = pl.Trainer(
@@ -505,7 +514,7 @@ if __name__ == "__main__":
             progress_bar_refresh_rate=1,
             max_epochs=args.epochs,
             accelerator="ddp",
-            callbacks=[checkpoint_callback, PrintImageCallback()],
+            callbacks=[checkpoint_callback, PrintImageCallback(), SaveGeneratorAsOnnxCallback()],
         )
 
     trainer.fit(model, dataset)
