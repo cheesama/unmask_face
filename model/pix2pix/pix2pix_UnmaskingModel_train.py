@@ -415,7 +415,7 @@ class SaveGeneratorAsOnnxCallback(Callback):
     def on_validation_epoch_end(self, trainer, pl_module):
         model = pl_module.generator
         model.eval()
-        torch.onnx.export(model, torch.randn(1, 3, 256, 256).to(model.device), "pix2pix_generator.onnx", verbose=True)
+        torch.onnx.export(model, torch.randn(1, 3, 256, 256).to(pl_module.device), "pix2pix_generator.onnx", verbose=True)
 
         # backup ckpt file in aws s3(if s3 env exists)
         if os.environ.get('AWS_SHARED_CREDENTIALS_FILE') is not None:
