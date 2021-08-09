@@ -120,7 +120,7 @@ class UNet(nn.Module):
 
         self.dec1_2 = CBR2d(in_channels=2 * 64, out_channels=64)
         self.dec1_1 = CBR2d(in_channels=64, out_channels=3)
-        
+
         self.tanh = nn.Tanh()
 
     def forward(self, x):
@@ -200,14 +200,14 @@ class PatchGAN(nn.Module):
             return patch
 
         self.stage_1 = PatchBlock(in_channels * 2, 64, normalize=False)
-        self.stage_2 = PatchBlock(64,128)
-        self.stage_3 = PatchBlock(128,256)
-        self.stage_4 = PatchBlock(256,512)
+        self.stage_2 = PatchBlock(64, 128)
+        self.stage_3 = PatchBlock(128, 256)
+        self.stage_4 = PatchBlock(256, 512)
 
-        self.patch = nn.Conv2d(512, 1, 3, padding=1) # 16x16 패치 생성
+        self.patch = nn.Conv2d(512, 1, 3, padding=1)  # 16x16 패치 생성
 
     def forward(self, a, b):
-        x = torch.cat((a,b),1) # (b, c, h, w)
+        x = torch.cat((a, b), 1)  # (b, c, h, w)
         x = self.stage_1(x)
         x = self.stage_2(x)
         x = self.stage_3(x)
@@ -215,6 +215,7 @@ class PatchGAN(nn.Module):
         x = self.patch(x)
         x = torch.sigmoid(x)
         return x
+
 
 # dataset definition
 class MaskDataset(Dataset):
@@ -235,11 +236,13 @@ class MaskDataset(Dataset):
         if transform is not None:
             self.transform = transform
         else:
-            self.transform = transforms.Compose([
-                transforms.Resize((img_size,img_size)),
-                transforms.ToTensor(),
-                transforms.Normalize([0.5,0.5,0.5],[0.5,0.5,0.5]),
-            ])
+            self.transform = transforms.Compose(
+                [
+                    transforms.Resize((img_size, img_size)),
+                    transforms.ToTensor(),
+                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+                ]
+            )
 
     def __len__(self):
         return len(self.file_names)
@@ -300,7 +303,7 @@ class MaskingDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=multiprocessing.cpu_count(),
-            pin_memory=True
+            pin_memory=True,
         )
 
     def val_dataloader(self):
@@ -314,7 +317,16 @@ class MaskingDataModule(pl.LightningDataModule):
 
 # model definition
 class UnmaskingModel(pl.LightningModule):
-    def __init__(self, ckpt_name, ckpt_bucket_name=None, gen_loss_weight=100, lr=2e-4, beta1=0.5, beta2=0.999, img_size=256):
+    def __init__(
+        self,
+        ckpt_name,
+        ckpt_bucket_name=None,
+        gen_loss_weight=100,
+        lr=2e-4,
+        beta1=0.5,
+        beta2=0.999,
+        img_size=256,
+    ):
         super(UnmaskingModel, self).__init__()
         self.ckpt_name = ckpt_name
         self.ckpt_bucket_name = ckpt_bucket_name
@@ -329,7 +341,7 @@ class UnmaskingModel(pl.LightningModule):
 
         self.disc_loss_func = nn.BCEWithLogitsLoss()
         self.gen_loss_func = nn.L1Loss()
-        
+
         self.tensorboard_input_imgs = []
         self.tensorboard_pred_imgs = []
 
@@ -338,7 +350,7 @@ class UnmaskingModel(pl.LightningModule):
     # 가중치 초기화
     def initialize_weights(self, model):
         class_name = model.__class__.__name__
-        if class_name.find('Conv') != -1:
+        if class_name.find("Conv") != -1:
             nn.init.normal_(model.weight.data, 0.0, 0.02)
 
     def forward(self, mask_img, unmask_img=None):
@@ -346,14 +358,14 @@ class UnmaskingModel(pl.LightningModule):
         if unmask_img is not None:
             disc_fake_predicted = self.discriminator(mask_img, gen_unmask_predicted)
             disc_real_predicted = self.discriminator(mask_img, unmask_img)
-        
+
             return gen_unmask_predicted, disc_fake_predicted, disc_real_predicted
-        
+
         return gen_unmask_predicted
 
     def denormalize(self, image, std=0.5, mean=0.5):
         return image * std + mean
-        
+
     def predict(self, mask_img):
         self.generator.eval()
         with torch.no_grad():
@@ -362,19 +374,31 @@ class UnmaskingModel(pl.LightningModule):
 
     def configure_optimizers(self):
         optim = torch.optim.Adam(self.parameters(), lr=self.lr)
-        lr_scheduler = ReduceLROnPlateau(optim, 'min', patience=2, factor=0.5, verbose=True)
-        
-        return {'optimizer': optim, 'lr_scheduler': lr_scheduler, 'monitor': 'val/gen_loss'}
+        lr_scheduler = ReduceLROnPlateau(
+            optim, "min", patience=2, factor=0.5, verbose=True
+        )
+
+        return {
+            "optimizer": optim,
+            "lr_scheduler": lr_scheduler,
+            "monitor": "val/gen_loss",
+        }
 
     def training_step(self, batch, batch_idx):
         self.generator.train()
 
         mask_img, unmask_img = batch
-        gen_unmask_predicted, disc_fake_predicted, disc_real_predicted = self.forward(mask_img, unmask_img)
+        gen_unmask_predicted, disc_fake_predicted, disc_real_predicted = self.forward(
+            mask_img, unmask_img
+        )
 
         gen_loss = self.gen_loss_func(gen_unmask_predicted, unmask_img)
-        disc_fake_loss = self.disc_loss_func(disc_fake_predicted, torch.zeros_like(disc_fake_predicted))
-        disc_real_loss = self.disc_loss_func(disc_real_predicted, torch.ones_like(disc_real_predicted))
+        disc_fake_loss = self.disc_loss_func(
+            disc_fake_predicted, torch.zeros_like(disc_fake_predicted)
+        )
+        disc_real_loss = self.disc_loss_func(
+            disc_real_predicted, torch.ones_like(disc_real_predicted)
+        )
 
         loss = gen_loss * self.gen_loss_weight + disc_fake_loss + disc_real_loss
 
@@ -390,11 +414,19 @@ class UnmaskingModel(pl.LightningModule):
 
         with torch.no_grad():
             mask_img, unmask_img = batch
-            gen_unmask_predicted, disc_fake_predicted, disc_real_predicted = self.forward(mask_img, unmask_img)
+            (
+                gen_unmask_predicted,
+                disc_fake_predicted,
+                disc_real_predicted,
+            ) = self.forward(mask_img, unmask_img)
 
             gen_loss = self.gen_loss_func(gen_unmask_predicted, unmask_img)
-            disc_fake_loss = self.disc_loss_func(disc_fake_predicted, torch.zeros_like(disc_fake_predicted))
-            disc_real_loss = self.disc_loss_func(disc_real_predicted, torch.ones_like(disc_real_predicted))
+            disc_fake_loss = self.disc_loss_func(
+                disc_fake_predicted, torch.zeros_like(disc_fake_predicted)
+            )
+            disc_real_loss = self.disc_loss_func(
+                disc_real_predicted, torch.ones_like(disc_real_predicted)
+            )
 
             loss = gen_loss * self.gen_loss_weight + disc_fake_loss + disc_real_loss
 
@@ -405,27 +437,43 @@ class UnmaskingModel(pl.LightningModule):
 
             if batch_idx % 3000 == 0:
                 self.tensorboard_input_imgs.append(self.denormalize(mask_img))
-                self.tensorboard_pred_imgs.append(self.denormalize(gen_unmask_predicted))
-                #self.tensorboard_input_imgs.append(mask_img)
-                #self.tensorboard_pred_imgs.append(gen_unmask_predicted)
+                self.tensorboard_pred_imgs.append(
+                    self.denormalize(gen_unmask_predicted)
+                )
+                # self.tensorboard_input_imgs.append(mask_img)
+                # self.tensorboard_pred_imgs.append(gen_unmask_predicted)
 
             return loss
+
 
 class SaveGeneratorAsOnnxCallback(Callback):
     def on_validation_epoch_end(self, trainer, pl_module):
         model = pl_module.generator
         model.eval()
-        torch.onnx.export(model, torch.randn(1, 3, 256, 256).to(pl_module.device), "pix2pix_generator.onnx", verbose=True)
+        torch.onnx.export(
+            model,
+            torch.randn(1, 3, 256, 256).to(pl_module.device),
+            "pix2pix_generator.onnx",
+            verbose=False,
+            input_names=["input"],
+            output_names=["output"],
+        )
 
         # backup ckpt file in aws s3(if s3 env exists)
-        if os.environ.get('AWS_SHARED_CREDENTIALS_FILE') is not None:
-            os.system(f'aws s3 cp pix2pix_generator.onnx s3://{pl_module.ckpt_bucket_name}/pix2pix/pix2pix_generator.onnx')
+        if os.environ.get("AWS_SHARED_CREDENTIALS_FILE") is not None:
+            os.system(
+                f"aws s3 cp pix2pix_generator.onnx s3://{pl_module.ckpt_bucket_name}/pix2pix/pix2pix_generator.onnx"
+            )
+
 
 class PrintImageCallback(Callback):
     def on_validation_epoch_end(self, trainer, pl_module):
         if trainer.current_epoch == 0:
             input_grid = torchvision.utils.make_grid(
-                torch.cat(pl_module.tensorboard_input_imgs), nrow=4, padding=4, normalize=True
+                torch.cat(pl_module.tensorboard_input_imgs),
+                nrow=4,
+                padding=4,
+                normalize=True,
             )
             trainer.logger.experiment.add_image(
                 f"UnmaskingModel_epoch:{trainer.current_epoch}_inputs",
@@ -434,7 +482,10 @@ class PrintImageCallback(Callback):
             )
 
         pred_grid = torchvision.utils.make_grid(
-            torch.cat(pl_module.tensorboard_pred_imgs), nrow=4, padding=4, normalize=True
+            torch.cat(pl_module.tensorboard_pred_imgs),
+            nrow=4,
+            padding=4,
+            normalize=True,
         )
         trainer.logger.experiment.add_image(
             f"UnmaskingModel_epoch:{trainer.current_epoch}_predictions",
@@ -446,10 +497,17 @@ class PrintImageCallback(Callback):
         pl_module.tensorboard_pred_imgs = []
 
         # backup ckpt file in aws s3(if s3 env exists)
-        if os.environ.get('AWS_SHARED_CREDENTIALS_FILE') is not None:
-            os.system(f'cp {pl_module.ckpt_name}.ckpt {pl_module.ckpt_name}_epoch:{trainer.current_epoch}.ckpt')
-            os.system(f'aws s3 cp {pl_module.ckpt_name}.ckpt s3://{pl_module.ckpt_bucket_name}/pix2pix/')
-            os.system(f'aws s3 cp {pl_module.ckpt_name}_epoch:{trainer.current_epoch}.ckpt s3://{pl_module.ckpt_bucket_name}/pix2pix/')
+        if os.environ.get("AWS_SHARED_CREDENTIALS_FILE") is not None:
+            os.system(
+                f"cp {pl_module.ckpt_name}.ckpt {pl_module.ckpt_name}_epoch:{trainer.current_epoch}.ckpt"
+            )
+            os.system(
+                f"aws s3 cp {pl_module.ckpt_name}.ckpt s3://{pl_module.ckpt_bucket_name}/pix2pix/"
+            )
+            os.system(
+                f"aws s3 cp {pl_module.ckpt_name}_epoch:{trainer.current_epoch}.ckpt s3://{pl_module.ckpt_bucket_name}/pix2pix/"
+            )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -468,14 +526,16 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=300)
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--train_ratio", type=float, default=0.9)
-    parser.add_argument("--ckpt_name", type=str, default='pix2pix_UnmaskingModel')
+    parser.add_argument("--ckpt_name", type=str, default="pix2pix_UnmaskingModel")
     parser.add_argument("--ckpt_bucket_name", type=str, default=None)
     args = parser.parse_args()
 
     seed_everything(2021)
 
     # model preparation
-    model = UnmaskingModel(lr=args.lr, ckpt_name=args.ckpt_name, ckpt_bucket_name=args.ckpt_bucket_name)
+    model = UnmaskingModel(
+        lr=args.lr, ckpt_name=args.ckpt_name, ckpt_bucket_name=args.ckpt_bucket_name
+    )
 
     # data module preparation
     dataset = MaskingDataModule(
@@ -490,23 +550,27 @@ if __name__ == "__main__":
     checkpoint_callback = ModelCheckpoint(
         dirpath="./",
         filename=args.ckpt_name,
-        #save_last=True,
-        #monitor="val_loss",
-        #save_top_k=1,
-        #mode="min",
+        # save_last=True,
+        # monitor="val_loss",
+        # save_top_k=1,
+        # mode="min",
     )
 
     # training
-    if os.path.exists(f'{args.ckpt_name}.ckpt'):
+    if os.path.exists(f"{args.ckpt_name}.ckpt"):
         trainer = pl.Trainer(
             precision=16,
-            resume_from_checkpoint=f'{args.ckpt_name}.ckpt',
+            resume_from_checkpoint=f"{args.ckpt_name}.ckpt",
             gpus=torch.cuda.device_count(),
             progress_bar_refresh_rate=1,
             max_epochs=args.epochs,
             accelerator="ddp",
-            callbacks=[checkpoint_callback, PrintImageCallback(), SaveGeneratorAsOnnxCallback()],
-        )    
+            callbacks=[
+                checkpoint_callback,
+                PrintImageCallback(),
+                SaveGeneratorAsOnnxCallback(),
+            ],
+        )
     else:
         trainer = pl.Trainer(
             precision=16,
@@ -514,7 +578,11 @@ if __name__ == "__main__":
             progress_bar_refresh_rate=1,
             max_epochs=args.epochs,
             accelerator="ddp",
-            callbacks=[checkpoint_callback, PrintImageCallback(), SaveGeneratorAsOnnxCallback()],
+            callbacks=[
+                checkpoint_callback,
+                PrintImageCallback(),
+                SaveGeneratorAsOnnxCallback(),
+            ],
         )
 
     trainer.fit(model, dataset)

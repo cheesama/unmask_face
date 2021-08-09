@@ -1,0 +1,8 @@
+fastapi
+streamlit
+
+torchvision
+pillow
+numpy
+onnx
+onnxruntime

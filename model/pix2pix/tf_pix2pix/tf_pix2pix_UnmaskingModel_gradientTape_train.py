@@ -274,10 +274,10 @@ def valid_step(model, mask_imgs, unmask_imgs, step):
     )
     loss = gen_loss * model.gen_loss_weight + disc_real_loss + disc_fake_loss
 
-    tf.summary.scalar("valid/gen_loss", gen_loss, step=step)
-    tf.summary.scalar("valid/disc_real_loss", disc_real_loss, step=step)
-    tf.summary.scalar("valid/disc_fake_loss", disc_fake_loss, step=step)
-    tf.summary.scalar("val_loss", loss, step=step)
+    tf.summary.scalar("valid/gen_loss", gen_loss)
+    tf.summary.scalar("valid/disc_real_loss", disc_real_loss)
+    tf.summary.scalar("valid/disc_fake_loss", disc_fake_loss)
+    tf.summary.scalar("val_loss", loss)
 
 
 if __name__ == "__main__":
