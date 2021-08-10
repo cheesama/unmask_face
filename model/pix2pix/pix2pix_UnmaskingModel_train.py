@@ -239,8 +239,9 @@ class MaskDataset(Dataset):
             self.transform = transforms.Compose(
                 [
                     transforms.Resize((img_size, img_size)),
+                    transforms.RandomHorizontalFlip(),
                     transforms.ToTensor(),
-                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+                    #transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
                 ]
             )
 
@@ -366,12 +367,6 @@ class UnmaskingModel(pl.LightningModule):
     def denormalize(self, image, std=0.5, mean=0.5):
         return image * std + mean
 
-    def predict(self, mask_img):
-        self.generator.eval()
-        with torch.no_grad():
-            gen_unmask_predicted = self.generator(mask_img)
-            return self.denormalize(gen_unmask_predicted)
-
     def configure_optimizers(self):
         optim = torch.optim.Adam(self.parameters(), lr=self.lr)
         lr_scheduler = ReduceLROnPlateau(
@@ -436,12 +431,10 @@ class UnmaskingModel(pl.LightningModule):
             self.log("val_loss", loss)
 
             if batch_idx % 3000 == 0:
-                self.tensorboard_input_imgs.append(self.denormalize(mask_img))
-                self.tensorboard_pred_imgs.append(
-                    self.denormalize(gen_unmask_predicted)
-                )
-                # self.tensorboard_input_imgs.append(mask_img)
-                # self.tensorboard_pred_imgs.append(gen_unmask_predicted)
+                #self.tensorboard_input_imgs.append(self.denormalize(mask_img))
+                #self.tensorboard_pred_imgs.append(self.denormalize(gen_unmask_predicted))
+                self.tensorboard_input_imgs.append(mask_img)
+                self.tensorboard_pred_imgs.append(gen_unmask_predicted)
 
             return loss
 
@@ -457,6 +450,7 @@ class SaveGeneratorAsOnnxCallback(Callback):
             verbose=False,
             input_names=["input"],
             output_names=["output"],
+
         )
 
         # backup ckpt file in aws s3(if s3 env exists)
@@ -473,7 +467,7 @@ class PrintImageCallback(Callback):
                 torch.cat(pl_module.tensorboard_input_imgs),
                 nrow=4,
                 padding=4,
-                normalize=True,
+                #normalize=True,
             )
             trainer.logger.experiment.add_image(
                 f"UnmaskingModel_epoch:{trainer.current_epoch}_inputs",
@@ -485,7 +479,7 @@ class PrintImageCallback(Callback):
             torch.cat(pl_module.tensorboard_pred_imgs),
             nrow=4,
             padding=4,
-            normalize=True,
+            #normalize=True,
         )
         trainer.logger.experiment.add_image(
             f"UnmaskingModel_epoch:{trainer.current_epoch}_predictions",
