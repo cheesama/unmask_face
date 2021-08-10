@@ -262,7 +262,7 @@ def train_step(model, mask_imgs, unmask_imgs, optimizer):
 
 
 @tf.function
-def valid_step(model, mask_imgs, unmask_imgs, step):
+def valid_step(model, mask_imgs, unmask_imgs, optimizer):
     gen_img, disc_real_output, disc_fake_output = model(mask_imgs, unmask_imgs)
 
     gen_loss = tf.reduce_mean(model.gen_loss_func(unmask_imgs, gen_img))
@@ -274,10 +274,10 @@ def valid_step(model, mask_imgs, unmask_imgs, step):
     )
     loss = gen_loss * model.gen_loss_weight + disc_real_loss + disc_fake_loss
 
-    tf.summary.scalar("valid/gen_loss", gen_loss)
-    tf.summary.scalar("valid/disc_real_loss", disc_real_loss)
-    tf.summary.scalar("valid/disc_fake_loss", disc_fake_loss)
-    tf.summary.scalar("val_loss", loss)
+    tf.summary.scalar("valid/gen_loss", gen_loss, step=optimizer.iterations)
+    tf.summary.scalar("valid/disc_real_loss", disc_real_loss, step=optimizer.iterations)
+    tf.summary.scalar("valid/disc_fake_loss", disc_fake_loss, step=optimizer.iterations)
+    tf.summary.scalar("val_loss", loss, step=optimizer.iterations)
 
 
 if __name__ == "__main__":
@@ -377,4 +377,4 @@ if __name__ == "__main__":
             total=(dataset_length - int(args.train_ratio * dataset_length))
             // args.batch_size,
         ):
-            valid_step(model, mask_imgs, unmask_imgs, tf.cast(ckpt.step, tf.int32))
+            valid_step(model, mask_imgs, unmask_imgs, optimizer)
