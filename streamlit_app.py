@@ -22,6 +22,8 @@ def valid_transform(image, img_size=256):
         ]
     )(image).unsqueeze(0)
 
+    return img_tensor
+
 def denormalize(img_tensor):
     return (img_tensor * 0.5) + 0.5
 
@@ -43,10 +45,12 @@ if __name__ == "__main__":
         image = Image.open(uploaded_file)
 
         ort_inputs = {model.get_inputs()[0].name: to_numpy(valid_transform(image))}
-        ort_outs = model.run(None, ort_inputs)
-        output = ort_outs[0]
+        output = model.run(None, ort_inputs)
+        output = output[0]
         output = denormalize(output)
 
-        st.image(transforms.ToPILImage()(output).convert('RGB'))
+        st.image(output.squeeze(0).transpose(1,2,0))
+
+
         
 
