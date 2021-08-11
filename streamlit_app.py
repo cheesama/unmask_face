@@ -18,7 +18,7 @@ def valid_transform(image, img_size=256):
         [
             transforms.Resize((img_size, img_size)),
             transforms.ToTensor(),
-            transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+            #transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
         ]
     )(image).unsqueeze(0)
 
@@ -47,7 +47,7 @@ if __name__ == "__main__":
         ort_inputs = {model.get_inputs()[0].name: to_numpy(valid_transform(image))}
         output = model.run(None, ort_inputs)
         output = output[0]
-        output = denormalize(output)
+        #output = denormalize(output)
 
         st.image(output.squeeze(0).transpose(1,2,0))
 

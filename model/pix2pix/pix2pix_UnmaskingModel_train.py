@@ -354,15 +354,13 @@ class UnmaskingModel(pl.LightningModule):
         if class_name.find("Conv") != -1:
             nn.init.normal_(model.weight.data, 0.0, 0.02)
 
-    def forward(self, mask_img, unmask_img=None):
+    def forward(self, mask_img, unmask_img):
         gen_unmask_predicted = self.generator(mask_img)
-        if unmask_img is not None:
-            disc_fake_predicted = self.discriminator(mask_img, gen_unmask_predicted)
-            disc_real_predicted = self.discriminator(mask_img, unmask_img)
+        
+        disc_fake_predicted = self.discriminator(mask_img, gen_unmask_predicted)
+        disc_real_predicted = self.discriminator(mask_img, unmask_img)
 
-            return gen_unmask_predicted, disc_fake_predicted, disc_real_predicted
-
-        return gen_unmask_predicted
+        return gen_unmask_predicted, disc_fake_predicted, disc_real_predicted
 
     def denormalize(self, image, std=0.5, mean=0.5):
         return image * std + mean
