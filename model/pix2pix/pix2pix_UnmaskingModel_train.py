@@ -241,7 +241,7 @@ class MaskDataset(Dataset):
                     transforms.Resize((img_size, img_size)),
                     transforms.RandomHorizontalFlip(),
                     transforms.ToTensor(),
-                    #transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
                 ]
             )
 
@@ -378,6 +378,7 @@ class UnmaskingModel(pl.LightningModule):
         }
 
     def training_step(self, batch, batch_idx):
+        self.discriminator.train()
         self.generator.train()
 
         mask_img, unmask_img = batch
@@ -403,6 +404,7 @@ class UnmaskingModel(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+        self.discriminator.eval()
         self.generator.eval()
 
         with torch.no_grad():
@@ -429,21 +431,21 @@ class UnmaskingModel(pl.LightningModule):
             self.log("val_loss", loss)
 
             if batch_idx % 3000 == 0:
-                #self.tensorboard_input_imgs.append(self.denormalize(mask_img))
-                #self.tensorboard_pred_imgs.append(self.denormalize(gen_unmask_predicted))
-                self.tensorboard_input_imgs.append(mask_img)
-                self.tensorboard_pred_imgs.append(gen_unmask_predicted)
+                self.tensorboard_input_imgs.append(self.denormalize(mask_img))
+                self.tensorboard_pred_imgs.append(self.denormalize(gen_unmask_predicted))
+                #self.tensorboard_input_imgs.append(mask_img)
+                #self.tensorboard_pred_imgs.append(gen_unmask_predicted)
 
             return loss
 
 
 class SaveGeneratorAsOnnxCallback(Callback):
-    def on_validation_epoch_end(self, trainer, pl_module):
+    def on_validation_epoch_end(self, trainer, pl_module, img_size=256):
         model = pl_module.generator
         model.eval()
         torch.onnx.export(
             model,
-            torch.randn(1, 3, 256, 256).to(pl_module.device),
+            torch.randn(1, 3, img_size, img_size).to(pl_module.device),
             "pix2pix_generator.onnx",
             verbose=False,
             input_names=["input"],
@@ -465,7 +467,7 @@ class PrintImageCallback(Callback):
                 torch.cat(pl_module.tensorboard_input_imgs),
                 nrow=4,
                 padding=4,
-                #normalize=True,
+                normalize=True,
             )
             trainer.logger.experiment.add_image(
                 f"UnmaskingModel_epoch:{trainer.current_epoch}_inputs",
@@ -477,7 +479,7 @@ class PrintImageCallback(Callback):
             torch.cat(pl_module.tensorboard_pred_imgs),
             nrow=4,
             padding=4,
-            #normalize=True,
+            normalize=True,
         )
         trainer.logger.experiment.add_image(
             f"UnmaskingModel_epoch:{trainer.current_epoch}_predictions",
