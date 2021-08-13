@@ -50,9 +50,10 @@ if __name__ == "__main__":
         output = denormalize(output)
 
         #increse image constrast
-        output = ((output - output.min()) / (output.max()-output.min())) * 255
+        #output = ((output - output.min()) / (output.max()-output.min())) * 255
 
-        st.image(output.squeeze(0).transpose(1,2,0))
+        #st.image(output.squeeze(0).transpose(1,2,0))
+        st.image(transforms.ToPILImage()(output[0]), caption='generated unmasked image')
 
 
         
