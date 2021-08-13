@@ -51,6 +51,6 @@ if __name__ == "__main__":
         output = denormalize(output)
 
         #increse image constrast
-        output = adjust_contrast(output, 1.5)
+        output = adjust_contrast(Image.fromarray(output.squeeze(0).astype('uint8'), 'RGB'), 1.5)
 
-        st.image(output.squeeze(0).transpose(1,2,0))
+        st.image(np.asarray(output).transpose(1,2,0))
