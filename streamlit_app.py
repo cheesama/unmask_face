@@ -1,4 +1,5 @@
 from PIL import Image
+from torchvision.transforms.functional import adjust_contrast
 
 import torchvision.transforms as transforms
 import streamlit as st
@@ -50,11 +51,6 @@ if __name__ == "__main__":
         output = denormalize(output)
 
         #increse image constrast
-        #output = ((output - output.min()) / (output.max()-output.min())) * 255
+        output = adjust_contrast(output, 1.5)
 
-        #st.image(output.squeeze(0).transpose(1,2,0))
-        st.image(transforms.ToPILImage()(output[0]), caption='generated unmasked image')
-
-
-        
-
+        st.image(output.squeeze(0).transpose(1,2,0))
