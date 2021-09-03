@@ -221,17 +221,22 @@ class PatchGAN(nn.Module):
 class MaskDataset(Dataset):
     def __init__(
         self,
-        unmask_img_folder,
         mask_img_folder,
-        img_size=256,
+        img_size=128,
         mask_postfix="_cloth",
         transform=None,
     ):
-        self.unmask_img_folder = unmask_img_folder
-        self.mask_img_folder = mask_img_folder
         self.mask_postfix = mask_postfix
         self.img_size = img_size
-        self.file_names = os.listdir(self.mask_img_folder)
+
+        self.unmask_file_names = []
+        self.mask_file_names = []
+
+        for root, dir, files in os.walk(mask_img_folder):
+            for each_file in files:
+                if mask_postfix in each_file:
+                    self.mask_file_names.append(root + os.sep + each_file)
+                    self.unmask_file_names.append(root + os.sep + each_file.replace(mask_postfix, ''))
 
         if transform is not None:
             self.transform = transform
@@ -239,22 +244,18 @@ class MaskDataset(Dataset):
             self.transform = transforms.Compose(
                 [
                     transforms.Resize((img_size, img_size)),
-                    transforms.RandomHorizontalFlip(),
+                    #transforms.RandomHorizontalFlip(),
                     transforms.ToTensor(),
                     transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
                 ]
             )
 
     def __len__(self):
-        return len(self.file_names)
+        return len(self.unmask_file_names)
 
     def __getitem__(self, idx):
-        unmask_img = Image.open(
-            self.unmask_img_folder
-            + os.sep
-            + self.file_names[idx].replace(self.mask_postfix, "")
-        )
-        mask_img = Image.open(self.mask_img_folder + os.sep + self.file_names[idx])
+        unmask_img = Image.open(self.unmask_file_names[idx])
+        mask_img = Image.open(self.mask_file_names[idx])
 
         unmask_img_tensor = self.transform(unmask_img)
         mask_img_tensor = self.transform(mask_img)
@@ -265,7 +266,6 @@ class MaskDataset(Dataset):
 class MaskingDataModule(pl.LightningDataModule):
     def __init__(
         self,
-        unmask_img_folder,
         mask_img_folder,
         batch_size,
         train_ratio=0.8,
@@ -274,7 +274,6 @@ class MaskingDataModule(pl.LightningDataModule):
         transform=None,
     ):
         super(MaskingDataModule, self).__init__()
-        self.unmask_img_folder = unmask_img_folder
         self.mask_img_folder = mask_img_folder
         self.mask_postfix = mask_postfix
         self.img_size = img_size
@@ -284,7 +283,6 @@ class MaskingDataModule(pl.LightningDataModule):
 
     def setup(self, stage=None) -> None:
         full_dataset = MaskDataset(
-            self.unmask_img_folder,
             self.mask_img_folder,
             self.img_size,
             self.mask_postfix,
@@ -321,7 +319,6 @@ class UnmaskingModel(pl.LightningModule):
     def __init__(
         self,
         ckpt_name,
-        ckpt_bucket_name=None,
         gen_loss_weight=100,
         lr=2e-4,
         beta1=0.5,
@@ -330,7 +327,6 @@ class UnmaskingModel(pl.LightningModule):
     ):
         super(UnmaskingModel, self).__init__()
         self.ckpt_name = ckpt_name
-        self.ckpt_bucket_name = ckpt_bucket_name
 
         self.gen_loss_weight = gen_loss_weight
         self.lr = lr
@@ -453,13 +449,6 @@ class SaveGeneratorAsOnnxCallback(Callback):
 
         )
 
-        # backup ckpt file in aws s3(if s3 env exists)
-        if os.environ.get("AWS_SHARED_CREDENTIALS_FILE") is not None:
-            os.system(
-                f"aws s3 cp pix2pix_generator.onnx s3://{pl_module.ckpt_bucket_name}/pix2pix/pix2pix_generator.onnx"
-            )
-
-
 class PrintImageCallback(Callback):
     def on_validation_epoch_end(self, trainer, pl_module):
         if trainer.current_epoch == 0:
@@ -490,46 +479,21 @@ class PrintImageCallback(Callback):
         pl_module.tensorboard_input_imgs = []
         pl_module.tensorboard_pred_imgs = []
 
-        # backup ckpt file in aws s3(if s3 env exists)
-        if os.environ.get("AWS_SHARED_CREDENTIALS_FILE") is not None:
-            os.system(
-                f"cp {pl_module.ckpt_name}.ckpt {pl_module.ckpt_name}_epoch:{trainer.current_epoch}.ckpt"
-            )
-            os.system(
-                f"aws s3 cp {pl_module.ckpt_name}.ckpt s3://{pl_module.ckpt_bucket_name}/pix2pix/"
-            )
-            os.system(
-                f"aws s3 cp {pl_module.ckpt_name}_epoch:{trainer.current_epoch}.ckpt s3://{pl_module.ckpt_bucket_name}/pix2pix/"
-            )
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--unmask_img_folder",
-        type=str,
-        default="../../data/celeba-mask-pair/unmask_images/raw",
-    )
-    parser.add_argument(
-        "--mask_img_folder",
-        type=str,
-        default="../../data/celeba-mask-pair/mask_images/raw",
-    )
+    parser.add_argument("--mask_img_folder", type=str)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--img_size", type=int, default=256)
     parser.add_argument("--epochs", type=int, default=300)
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--train_ratio", type=float, default=0.9)
     parser.add_argument("--ckpt_name", type=str, default="pix2pix_UnmaskingModel")
-    parser.add_argument("--ckpt_bucket_name", type=str, default=None)
     args = parser.parse_args()
 
     seed_everything(2021)
 
     # model preparation
-    model = UnmaskingModel(
-        lr=args.lr, ckpt_name=args.ckpt_name, ckpt_bucket_name=args.ckpt_bucket_name
-    )
+    model = UnmaskingModel(lr=args.lr, ckpt_name=args.ckpt_name)
 
     # data module preparation
     dataset = MaskingDataModule(
