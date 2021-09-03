@@ -498,7 +498,6 @@ if __name__ == "__main__":
     # data module preparation
     dataset = MaskingDataModule(
         mask_img_folder=args.mask_img_folder,
-        unmask_img_folder=args.unmask_img_folder,
         batch_size=args.batch_size,
         train_ratio=args.train_ratio,
         img_size=args.img_size,
